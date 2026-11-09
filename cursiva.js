@@ -95,3 +95,51 @@
 
   window.Cursiva = { build, letter, SLANT: -12 };
 })();
+
+// Letras de imprenta (manuscrita escolar) para inglés.
+// Línea base y=0, altura de la x = -60, ascendentes -120, descendentes +52.
+(function () {
+  const K = 0.5523;
+  function circ(cx, cy, r, from) {
+    // Círculo en sentido antihorario visual empezando a la derecha (from='r') o arriba (from='t')
+    const k = r * K;
+    const R = [cx + r, cy], T = [cx, cy - r], Lf = [cx - r, cy], B = [cx, cy + r];
+    const segs = {
+      rt: ['C', cx + r, cy - k, cx + k, cy - r, T[0], T[1]],
+      tl: ['C', cx - k, cy - r, cx - r, cy - k, Lf[0], Lf[1]],
+      lb: ['C', cx - r, cy + k, cx - k, cy + r, B[0], B[1]],
+      br: ['C', cx + k, cy + r, cx + r, cy + k, R[0], R[1]],
+    };
+    return from === 't' ? [segs.tl, segs.lb, segs.br, segs.rt] : [segs.rt, segs.tl, segs.lb, segs.br];
+  }
+  const G = {
+    a: { w: 60, start: [60, -30], s: [...circ(30, -30, 30, 'r'), ['L', 60, -60], ['L', 60, 0]] },
+    d: { w: 60, start: [60, -30], s: [...circ(30, -30, 30, 'r'), ['L', 60, -120], ['L', 60, 0]] },
+    g: { w: 60, start: [60, -30], s: [...circ(30, -30, 30, 'r'), ['L', 60, -60], ['L', 60, 28], ['C', 60, 46, 48, 54, 32, 54], ['C', 18, 54, 8, 48, 4, 40]] },
+    o: { w: 60, start: [30, -60], s: circ(30, -30, 30, 't') },
+    b: { w: 60, start: [0, -120], s: [['L', 0, 0], ['L', 0, -30], ['C', 0, -46.6, 13.4, -60, 30, -60], ['C', 46.6, -60, 60, -46.6, 60, -30], ['C', 60, -13.4, 46.6, 0, 30, 0], ['C', 13.4, 0, 0, -13.4, 0, -30]] },
+    h: { w: 54, start: [0, -120], s: [['L', 0, 0], ['L', 0, -36], ['C', 5, -52, 16, -60, 29, -60], ['C', 45, -60, 54, -50, 54, -34], ['L', 54, 0]] },
+    t: { w: 44, start: [20, -104], s: [['L', 20, -12], ['C', 20, -3, 26, 0, 32, 0], ['C', 37, 0, 41, -2, 44, -5]], cross: [2, -60, 42, -60] },
+    e: { w: 60, start: [3, -30], s: [['L', 59, -30], ['C', 59, -48, 47, -60, 31, -60], ['C', 14, -60, 2, -47, 2, -30], ['C', 2, -12, 15, 0, 32, 0], ['C', 44, 0, 53, -5, 58, -13]] },
+  };
+  const GAP = 22;
+  function build(word) {
+    let ox = 0, d = '';
+    const lifts = [], ranges = [];
+    const chars = Array.from(word);
+    chars.forEach((ch, i) => {
+      const g = G[ch]; if (!g) return;
+      d += `M ${g.start[0] + ox} ${g.start[1]}`;
+      for (const s of g.s) {
+        if (s[0] === 'L') d += ` L ${s[1] + ox} ${s[2]}`;
+        else d += ` C ${s[1] + ox} ${s[2]} ${s[3] + ox} ${s[4]} ${s[5] + ox} ${s[6]}`;
+      }
+      d += ' ';
+      if (g.cross) lifts.push({ type: 'cross', x1: g.cross[0] + ox, y1: g.cross[1], x2: g.cross[2] + ox, y2: g.cross[3] });
+      ranges.push({ ch, x0: ox, x1: ox + g.w });
+      ox += g.w + (i < chars.length - 1 ? GAP : 0);
+    });
+    return { d: d.trim(), width: ox, lifts, ranges };
+  }
+  window.Imprenta = { build, letter: build, SLANT: 0, XH: 60 };
+})();

@@ -117,3 +117,7 @@ html, body {
 .gate { text-align: center; }
 .gate .nums { display: flex; gap: 14px; justify-content: center; margin: 18px 0 6px; }
 .gate .nums button { width: 86px; height: 86px; font-size: 34px; border-radius: 20px; }
+.a-sit { animation: sit 2.4s ease-in-out 1; }
+@keyframes sit { 20%,80% { transform: translateY(26px) scale(1.07,.8); } }
+.a-lie { animation: lie 3s ease-in-out 1; }
+@keyframes lie { 25%,80% { transform: translateY(60px) scale(1.32,.52); } }

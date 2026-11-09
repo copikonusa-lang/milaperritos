@@ -1,4 +1,4 @@
-/* MilaPerritos · Prototipo de la primera misión (mesa · mamá · misa) en cursiva Palmer */
+/* MilaPerritos · Misión 1 (mesa · mamá · misa, cursiva Palmer) y Misión 2 (hat · bag · bed · hot, inglés) */
 (function () {
   'use strict';
   const NS = 'http://www.w3.org/2000/svg';
@@ -21,18 +21,66 @@
   const C_PINK = '#e86a7a';
 
   // ------------------------------------------------------------------ Estado (solo en memoria)
-  const WORDS = ['mesa', 'mamá', 'misa'];
-  const TRICKS = [
-    { id: 'patita', name: 'Dar la patita', verb: 'dar la patita' },
-    { id: 'rodar', name: 'Rodar', verb: 'rodar' },
-    { id: 'pelota', name: 'Atrapar la pelota', verb: 'atrapar la pelota' },
+  // Cada misión: sus palabras, el perrito que aprende los trucos y el perrito nuevo que llega a la manada.
+  const LESSONS = [
+    {
+      id: 'l1', name: 'Misión 1', title: 'Misión 1 · Español', sub: 'Español · letra cursiva',
+      words: ['mesa', 'mamá', 'misa'], warmup: true, lang: 'es', star: 'main', starName: 'tu perrito',
+      friend: 'canela', friendName: 'Canela', friendSay: '¡Llegó Canela, una nueva amiga para tu manada!',
+      distract: { 'mesa': 'misa', 'mamá': 'mesa', 'misa': 'mamá' },
+      tricks: [
+        { id: 'patita', name: 'Dar la patita', verb: 'dar la patita' },
+        { id: 'rodar', name: 'Rodar', verb: 'rodar' },
+        { id: 'pelota', name: 'Atrapar la pelota', verb: 'atrapar la pelota' },
+      ],
+    },
+    {
+      id: 'l2', name: 'Misión 2', title: 'Misión 2 · Inglés', sub: 'Inglés · letra de imprenta',
+      words: ['hat', 'bag', 'bed', 'hot'], warmup: false, lang: 'en', star: 'canela', starName: 'Canela',
+      friend: 'coco', friendName: 'Coco', friendSay: '¡Llegó Coco, un perrito nuevo para tu manada!',
+      distract: { 'hat': 'hot', 'hot': 'hat', 'bag': 'bed', 'bed': 'bag' },
+      tricks: [
+        { id: 'sentarse', name: 'Sentarse', verb: 'sentarse' },
+        { id: 'patita2', name: 'Dar la patita', verb: 'dar la patita' },
+        { id: 'acostarse', name: 'Acostarse', verb: 'acostarse' },
+        { id: 'saltar', name: 'Saltar', verb: 'saltar' },
+      ],
+    },
   ];
+  const EN_WORDS = new Set(LESSONS.filter((l) => l.lang === 'en').flatMap((l) => l.words));
+  const PRINT_WORDS = EN_WORDS;
+  function lessonOf(word) { return LESSONS.find((l) => l.words.includes(word)) || LESSONS[0]; }
+  function lessonDone(l) { return l.words.every((w) => S.progress[w] && S.progress[w].done); }
+  let LES = LESSONS[0], WORDS = LES.words, TRICKS = LES.tricks;
+  function setLesson(id) {
+    LES = LESSONS.find((l) => l.id === id) || LESSONS[0];
+    WORDS = LES.words; TRICKS = LES.tricks; S.lesson = LES.id;
+  }
+  function blankWord() { return { find: null, build: null, read: null, write: null, trick: null, done: false }; }
   function freshState() {
     const p = {};
-    WORDS.forEach((w) => (p[w] = { find: null, build: null, read: null, write: null, trick: null, done: false }));
-    return { warmup: false, progress: p, friends: [], sound: true, voice: true };
+    LESSONS.forEach((l) => l.words.forEach((w) => (p[w] = blankWord())));
+    // Misión 1 ya la completó Milana (mesa, mamá, misa) y Canela ya está en su manada.
+    LESSONS[0].words.forEach((w, i) => { p[w].done = true; p[w].trick = LESSONS[0].tricks[i].id; p[w].prev = true; });
+    return { warmup: true, progress: p, friends: ['canela'], sound: true, voice: true, lesson: 'l2' };
   }
-  let S = freshState();
+  const STORE = 'milaperritos_v2';
+  function loadState() {
+    const base = freshState();
+    try {
+      const raw = localStorage.getItem(STORE);
+      if (!raw) return base;
+      const d = JSON.parse(raw);
+      const st = Object.assign(base, d);
+      st.progress = Object.assign(freshState().progress, d.progress || {});
+      if (!Array.isArray(st.friends)) st.friends = [];
+      if (!st.friends.includes('canela')) st.friends.unshift('canela');
+      return st;
+    } catch (e) { return base; }
+  }
+  function save() { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch (e) {} }
+  let S = loadState();
+  setLesson(S.lesson || 'l2');
 
   // ------------------------------------------------------------------ Utilidades SVG
   function el(tag, attrs, parent) {
@@ -157,26 +205,60 @@
   };
 
   // ------------------------------------------------------------------ Voz (prototipo: síntesis del navegador)
-  let esVoice = null;
+  let esVoice = null, enVoice = null;
   function pickVoice() {
     if (!('speechSynthesis' in window)) return;
     const vs = speechSynthesis.getVoices();
+    const norm = (x) => (x.lang || '').replace('_', '-');
+    esVoice = null; enVoice = null;
     const pref = ['es-VE', 'es-US', 'es-419', 'es-MX', 'es-CO', 'es-ES'];
-    for (const p of pref) { const v = vs.find((x) => x.lang && x.lang.replace('_', '-') === p); if (v) { esVoice = v; return; } }
-    esVoice = vs.find((x) => x.lang && x.lang.toLowerCase().startsWith('es')) || null;
+    for (const p of pref) { const v = vs.find((x) => norm(x) === p); if (v) { esVoice = v; break; } }
+    if (!esVoice) esVoice = vs.find((x) => norm(x).toLowerCase().startsWith('es')) || null;
+    // Inglés: preferimos voces de EE. UU. de buena calidad
+    const en = vs.filter((x) => norm(x).toLowerCase().startsWith('en'));
+    const score = (v) => (norm(v) === 'en-US' ? 10 : 0) + (/google|natural|neural|samantha|aria|jenny|zira/i.test(v.name) ? 5 : 0) + (v.localService ? 0 : 1);
+    enVoice = en.sort((a, b) => score(b) - score(a))[0] || null;
+  }
+  function splitLang(text) {
+    // separa las palabras en inglés para que se digan con voz en inglés
+    const parts = [];
+    const re = /[A-Za-zÁÉÍÓÚáéíóúñÑüÜ]+/g;
+    let last = 0, m, buf = '';
+    while ((m = re.exec(text))) {
+      if (EN_WORDS.has(m[0].toLowerCase())) {
+        buf += text.slice(last, m.index);
+        if (buf.trim()) parts.push({ t: buf, lang: 'es' });
+        buf = '';
+        parts.push({ t: m[0].toLowerCase(), lang: 'en' });
+        last = m.index + m[0].length;
+      }
+    }
+    buf += text.slice(last);
+    if (buf.replace(/[\s¿?¡!.,:;]/g, '')) parts.push({ t: buf, lang: 'es' });
+    return parts;
   }
   if ('speechSynthesis' in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
   function say(text, opts) {
     opts = opts || {};
+    text = starText(text);
     if (!S.voice || !('speechSynthesis' in window)) { if (opts.onend) later(900, opts.onend); return; }
     try {
       if (!opts.queue) speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = esVoice ? esVoice.lang : 'es-VE';
-      if (esVoice) u.voice = esVoice;
-      u.rate = opts.rate || 0.88; u.pitch = 1.08;
-      if (opts.onend) u.onend = opts.onend;
-      speechSynthesis.speak(u);
+      const parts = splitLang(text);
+      parts.forEach((pt, i) => {
+        const u = new SpeechSynthesisUtterance(pt.t);
+        if (pt.lang === 'en') {
+          u.lang = enVoice ? enVoice.lang : 'en-US';
+          if (enVoice) u.voice = enVoice;
+          u.rate = 0.72; u.pitch = 1.05;
+        } else {
+          u.lang = esVoice ? esVoice.lang : 'es-VE';
+          if (esVoice) u.voice = esVoice;
+          u.rate = opts.rate || 0.88; u.pitch = 1.08;
+        }
+        if (opts.onend && i === parts.length - 1) u.onend = opts.onend;
+        speechSynthesis.speak(u);
+      });
     } catch (e) { /* sin voz */ }
   }
   function hush() { try { if ('speechSynthesis' in window) speechSynthesis.cancel(); } catch (e) {} }
@@ -270,9 +352,13 @@
   const COATS = {
     main: { body: '#e8b07a', dark: '#d69a62', ear: '#8b5a2b', light: '#f7dec0', tail: '#c98a4e' },
     canela: { body: '#c9743a', dark: '#b5652f', ear: '#6e3b1a', light: '#f3c9a0', tail: '#a85a28' },
+    coco: { body: '#f2ece2', dark: '#ddd2c0', ear: '#4a3a30', light: '#ffffff', tail: '#d8ccb8' },
   };
+  const COLLAR = { main: '#e25555', canela: C_PURPLE, coco: C_BLUE };
+  const PUP_NAME = { main: 'tu perrito', canela: 'Canela', coco: 'Coco' };
   function puppy(parent, x, y, s, coatName) {
-    const coat = COATS[coatName || 'main'];
+    coatName = coatName || LES.star || 'main';
+    const coat = COATS[coatName];
     const root = el('g', { transform: `translate(${x},${y}) scale(${s})` }, parent);
     el('ellipse', { cx: 0, cy: 6, rx: 100, ry: 16, fill: 'rgba(0,0,0,.12)' }, root);
     const lift = el('g', { transform: 'translate(0,-110)' }, root);
@@ -297,7 +383,7 @@
     el('rect', { x: -17, y: 0, width: 34, height: 72, rx: 17, fill: coat.body }, legR);
     el('ellipse', { cx: 0, cy: 68, rx: 21, ry: 11, fill: coat.light }, legR);
     // collar
-    el('path', { d: 'M-52 -134 Q 0 -108 52 -134', fill: 'none', stroke: coatName === 'canela' ? C_PURPLE : '#e25555', 'stroke-width': 13, 'stroke-linecap': 'round' }, body);
+    el('path', { d: 'M-52 -134 Q 0 -108 52 -134', fill: 'none', stroke: COLLAR[coatName] || '#e25555', 'stroke-width': 13, 'stroke-linecap': 'round' }, body);
     el('circle', { cx: 0, cy: -116, r: 10, fill: C_GOLD }, body);
     // cabeza
     const headP = el('g', { transform: 'translate(0,-160)' }, body);
@@ -348,7 +434,7 @@
       confused() { P.headDo('h-tilt'); SFX.sniff(); },
       trick(id) {
         P.wag('fast'); P.tongue(true);
-        if (id === 'patita') { restartClass(legR, 'leg-up'); SFX.yip(0.4); SFX.yip(1.2); }
+        if (id === 'patita' || id === 'patita2') { restartClass(legR, 'leg-up'); SFX.yip(0.4); SFX.yip(1.2); }
         else if (id === 'rodar') { P.play('a-roll'); SFX.yip(1.2); }
         else if (id === 'pelota') {
           P.tongue(false);
@@ -362,21 +448,27 @@
           }, () => { b.remove(); P.ball(true); SFX.yip(); later(1600, () => P.ball(false)); });
           later(420, () => P.play('a-hop'));
         } else if (id === 'bailar') { P.play('a-dance'); SFX.yips(2); }
+        else if (id === 'sentarse') { P.play('a-sit'); SFX.yip(0.2); later(1700, () => SFX.yip()); }
+        else if (id === 'acostarse') { P.play('a-lie'); P.wag('slow'); later(700, () => P.eyes(true)); later(2300, () => { P.eyes(false); SFX.yip(); }); }
+        else if (id === 'saltar') { P.play('a-jump'); SFX.yips(3); }
       },
     };
     return P;
   }
 
   // ------------------------------------------------------------------ Dibujo de palabras en cursiva
+  function isPrint(word) { return PRINT_WORDS.has(word); }
+  function modFor(word, o) { return (o && o.print != null ? o.print : isPrint(word)) ? Imprenta : C; }
   function cursiveWord(parent, word, o) {
     o = o || {};
-    const b = C.build(word, { tail: o.tail !== false });
-    const s = o.scale || 1;
-    const sk = Math.tan((C.SLANT * Math.PI) / 180);
+    const M = modFor(word, o);
+    const b = M.build(word, { tail: o.tail !== false });
+    const s = (o.scale || 1) * (M === C ? 1 : 0.88);
+    const sk = Math.tan((M.SLANT * Math.PI) / 180);
     // centro visual: la inclinación desplaza la parte alta hacia la derecha
     const cx = o.cx != null ? o.cx - (b.width * s) / 2 + 50 * s * sk : o.x;
-    const by = o.baseline;
-    const g = el('g', { transform: `translate(${cx},${by}) scale(${s}) skewX(${C.SLANT})` }, parent);
+    const by = o.baseline + (M === C ? 0 : -6 * s);
+    const g = el('g', { transform: `translate(${cx},${by}) scale(${s}) skewX(${M.SLANT})` }, parent);
     const path = el('path', {
       d: b.d, fill: 'none', stroke: o.color || C_INK, 'stroke-width': o.sw || 9,
       'stroke-linecap': 'round', 'stroke-linejoin': 'round',
@@ -406,7 +498,13 @@
   }
   function stopIdle() { if (inactivity) { clearTimeout(inactivity); inactivity = null; } }
 
+  function starText(t) {
+    if (LES.star === 'main') return t;
+    const n = PUP_NAME[LES.star];
+    return t.replace(/Tu perrito/g, n).replace(/tu perrito/g, n);
+  }
   function instruction(text) {
+    text = starText(text);
     const g = el('g', { cls: 'fade-in' }, L.scene);
     const w = Math.min(1180, text.length * 22 + 120);
     el('rect', { x: 800 - w / 2, y: 34, width: w, height: 84, rx: 42, fill: 'rgba(255,255,255,.88)' }, g);
@@ -493,6 +591,7 @@
     clear(L.scene); clear(L.fx);
     lockUntil = performance.now() + 600;
     current = name;
+    save();
     SCREENS[name](arg);
     parentLock();
   }
@@ -504,7 +603,7 @@
   SCREENS.home = function () {
     bgPark();
     el('text', { x: 800, y: 150, 'text-anchor': 'middle', 'font-size': 92, 'font-weight': 900, fill: C_INK, text: 'MilaPerritos', 'letter-spacing': '-1' }, L.scene);
-    el('text', { x: 800, y: 210, 'text-anchor': 'middle', 'font-size': 32, 'font-weight': 700, fill: '#6b5440', text: 'Primera misión · letra cursiva' }, L.scene);
+    el('text', { x: 800, y: 210, 'text-anchor': 'middle', 'font-size': 32, 'font-weight': 700, fill: '#6b5440', text: LES.title + ' · ' + (LES.lang === 'en' ? 'letra de imprenta' : 'letra cursiva') }, L.scene);
     el('ellipse', { cx: 800, cy: 640, rx: 230, ry: 50, fill: '#8b5fd0' }, L.scene);
     el('ellipse', { cx: 800, cy: 628, rx: 200, ry: 36, fill: '#b48cf0' }, L.scene);
     const pup = puppy(L.scene, 800, 640, 1.05);
@@ -526,16 +625,14 @@
   };
 
   // ---------------------------------------------------------------- Mapa del parque
-  const NODES = [
-    { key: 'warmup', x: 250, y: 690 },
-    { key: 'mesa', x: 610, y: 520 },
-    { key: 'mamá', x: 980, y: 640 },
-    { key: 'misa', x: 1290, y: 440 },
-    { key: 'party', x: 1450, y: 250 },
-  ];
-  function nodeDone(k) { return k === 'warmup' ? S.warmup : k === 'party' ? false : S.progress[k].done; }
+  const NODE_POS = [{ x: 250, y: 690 }, { x: 610, y: 520 }, { x: 980, y: 640 }, { x: 1290, y: 440 }, { x: 1450, y: 250 }];
+  function nodesFor(l) {
+    const keys = l.warmup ? ['warmup', ...l.words, 'party'] : [...l.words, 'party'];
+    return keys.map((k, i) => ({ key: k, x: NODE_POS[i].x, y: NODE_POS[i].y }));
+  }
+  function nodeDone(k) { return k === 'warmup' ? S.warmup : k === 'party' ? (S.friends.includes(LES.friend)) : S.progress[k].done; }
   function nextNode() {
-    if (!S.warmup) return 'warmup';
+    if (LES.warmup && !S.warmup) return 'warmup';
     for (const w of WORDS) if (!S.progress[w].done) return w;
     return 'party';
   }
@@ -547,6 +644,19 @@
     el('path', { d, fill: 'none', stroke: '#f7ecca', 'stroke-width': 46, 'stroke-linecap': 'round', 'stroke-dasharray': '2 38' }, L.scene);
     const nxt = nextNode();
     const allDone = WORDS.every((w) => S.progress[w].done);
+    const NODES = nodesFor(LES);
+    // selector de misiones
+    LESSONS.forEach((l, i) => {
+      const on = l.id === LES.id, fin = lessonDone(l) && S.friends.includes(l.friend);
+      const bx = 150 + i * 250, by = 200;
+      const b = el('g', { transform: `translate(${bx},${by})` }, L.scene);
+      const bi = el('g', { cls: 'press' }, b);
+      el('rect', { x: -112, y: -40, width: 224, height: 80, rx: 40, fill: on ? C_ORANGE : 'rgba(255,255,255,.9)', stroke: on ? 'none' : '#e1d6c0', 'stroke-width': 3 }, bi);
+      el('text', { x: fin ? -12 : 0, y: -4, 'text-anchor': 'middle', 'font-size': 26, 'font-weight': 900, fill: on ? '#fff' : C_INK, text: l.name }, bi);
+      el('text', { x: fin ? -12 : 0, y: 24, 'text-anchor': 'middle', 'font-size': 20, 'font-weight': 800, fill: on ? '#fff' : '#7a6a55', text: l.lang === 'en' ? 'Inglés' : 'Español' }, bi);
+      if (fin) star(bi, 82, 0, 18, C_GOLD);
+      onTap(b, () => { if (!on) { setLesson(l.id); go('map'); } });
+    });
     NODES.forEach((n, i) => {
       if (n.key === 'party' && !allDone) {
         const g = el('g', { transform: `translate(${n.x},${n.y})`, opacity: 0.5 }, L.scene);
@@ -575,12 +685,13 @@
       });
     });
     const at = NODES.find((n) => n.key === nxt) || NODES[0];
-    const pup = puppy(L.scene, at.x + 150, at.y + 70, 0.55);
+    const pup = puppy(L.scene, at.x + (at.x > 1350 ? -150 : 150), at.y + 70, 0.55);
     pup.hop();
     bottomBar({ park: false });
     button(L.scene, { x: 120, y: 820, w: 110, h: 110, fill: 'rgba(255,255,255,.9)', icon: 'house', iconColor: C_ORANGE, onTap: () => go('casita') });
+    const nW = ['', 'una', 'dos', 'tres', 'cuatro', 'cinco'][WORDS.length];
     instruction(nxt === 'party' ? '¡Lo lograste! Toca la estrella para la fiesta' : 'Toca la huellita que brilla');
-    later(500, () => say(nxt === 'party' ? '¡Terminaste las tres palabras! Toca la estrella para la fiesta.' : nxt === 'warmup' ? 'Primero vamos a calentar con la letra m. Toca la huellita que brilla.' : 'Toca la huellita que brilla para la siguiente palabra.'));
+    later(500, () => say(nxt === 'party' ? `¡Terminaste las ${nW} palabras! Toca la estrella para la fiesta.` : (nxt === WORDS[0] && LES.lang === 'en' && !S.progress[nxt].find && S.progress[nxt].find !== 0) ? `${LES.title.replace('·', '.')}. Hoy vamos a aprender palabras en inglés con Canela. Toca la huellita que brilla.` : nxt === 'warmup' ? 'Primero vamos a calentar con la letra m. Toca la huellita que brilla.' : 'Toca la huellita que brilla para la siguiente palabra.'));
   };
   function star(g, x, y, r, color) {
     let d = '';
@@ -597,10 +708,16 @@
     const area = el('g', {}, L.scene);
     el('rect', { x: 110, y: 150, width: 1380, height: 560, rx: 40, fill: '#f4e3bf' }, area);
     el('rect', { x: 110, y: 150, width: 1380, height: 560, rx: 40, fill: 'none', stroke: '#e5cf9f', 'stroke-width': 4 }, area);
-    const bTmp = C.build(word);
+    const PR = isPrint(word);
+    const bTmp = modFor(word).build(word);
     const s = Math.min(2.5, 1150 / bTmp.width);
-    const baseline = 520;
+    const baseline = PR ? 540 : 520;
     el('line', { x1: 160, y1: baseline, x2: 1440, y2: baseline, stroke: '#d8c49a', 'stroke-width': 3 }, area);
+    if (PR) {
+      const se = s * 0.88, by = baseline - 6 * se;
+      el('line', { x1: 160, y1: by - 60 * se, x2: 1440, y2: by - 60 * se, stroke: '#e3d2ad', 'stroke-width': 3, 'stroke-dasharray': '14 12' }, area);
+      el('line', { x1: 160, y1: by - 120 * se, x2: 1440, y2: by - 120 * se, stroke: '#e3d2ad', 'stroke-width': 3 }, area);
+    } else
     el('line', { x1: 160, y1: baseline - 100 * s, x2: 1440, y2: baseline - 100 * s, stroke: '#e3d2ad', 'stroke-width': 3, 'stroke-dasharray': '14 12' }, area);
     // carretera
     const road = cursiveWord(area, word, { cx: 800, baseline, scale: s, sw: 38, color: '#fff4da', lifts: false });
@@ -614,6 +731,12 @@
     // punto de inicio
     const p0 = fill.path.getPointAtLength(0);
     const startDot = el('circle', { cx: p0.x, cy: p0.y, r: 14, fill: C_GREEN }, road.g);
+    // en imprenta cada letra tiene su punto de inicio
+    const letterStarts = [];
+    if (PR) (road.b.d.match(/M\s*[-\d.]+\s+[-\d.]+/g) || []).slice(1).forEach((m) => {
+      const [x, y] = m.replace('M', '').trim().split(/\s+/).map(Number);
+      letterStarts.push(el('circle', { cx: x, cy: y, r: 10, fill: C_GREEN, opacity: 0.55 }, road.g));
+    });
     // muestras del camino
     const N = Math.ceil(LEN / 3);
     const pts = [];
@@ -782,7 +905,7 @@
     bgPark({ ground: 700 });
     stationDots(0);
     instruction('Escucha y toca la palabra');
-    const distract = { 'mesa': 'misa', 'mamá': 'mesa', 'misa': 'mamá' }[word];
+    const distract = lessonOf(word).distract[word];
     const pair = Math.random() < 0.5 ? [word, distract] : [distract, word];
     const pup = puppy(L.scene, 1400, 830, 0.6);
     let wrong = 0, hint = 0, finished = false;
@@ -875,7 +998,7 @@
       const inner = el('g', {}, g);
       const box = el('rect', { x: -TW / 2, y: -TW / 2, width: TW, height: TW, rx: 28, fill: '#fff', stroke: C_ORANGE, 'stroke-width': 4 }, inner);
       el('rect', { x: -TW / 2 + 8, y: TW / 2 - 14, width: TW - 16, height: 8, rx: 4, fill: 'rgba(0,0,0,.06)' }, inner);
-      cursiveWord(inner, ch, { cx: 0, baseline: 40, scale: ch === 'm' ? 0.8 : 0.95, sw: 11, tail: false });
+      cursiveWord(inner, ch, { cx: 0, baseline: 40, scale: ch === 'm' ? 0.8 : 0.95, sw: 11, tail: false, print: isPrint(word) });
       const t = { ch, g, inner, box, hx, hy, x: hx, y: hy, placed: false };
       g.style.touchAction = 'none';
       return t;
@@ -996,7 +1119,7 @@
         slots.forEach((s) => s.g.setAttribute('opacity', 0.25));
         const big = cursiveWord(L.scene, word, { cx: 800, baseline: 520, scale: 1.45, sw: 12, color: C_INK });
         big.liftEls.forEach((x) => x.setAttribute('opacity', 0));
-        say('¡Las letras se dieron la mano!');
+        say(isPrint(word) ? '¡Armaste la palabra!' : '¡Las letras se dieron la mano!');
         drawOn(big.path, 1700, () => {
           big.liftEls.forEach((x) => x.setAttribute('opacity', 1));
           pup.happy(); fxStars(800, 430);
@@ -1070,7 +1193,7 @@
     const prompt = `Escribe ${word} en cursiva. Empieza en el punto verde y sigue a tu perrito sin levantar el dedo.`;
     const tb = traceBoard(word, {
       onActivity: () => armIdle(10000, idleHint),
-      onLift: () => say(word === 'misa' ? 'Ahora el puntito de la i. Toca la mariposa.' : word === 'mamá' ? 'Ahora la rayita de la a. Toca la mariposa.' : ''),
+      onLift: () => say(word === 'misa' ? 'Ahora el puntito de la i. Toca la mariposa.' : word === 'mamá' ? 'Ahora la rayita de la a. Toca la mariposa.' : word.includes('t') ? 'Ahora la rayita de la t. Toca la mariposa.' : ''),
       onDone: () => {
         stopIdle();
         S.progress[word].write = demoUsed ? 'demo' : hint ? 'pista' : 'sola';
@@ -1124,7 +1247,7 @@
         later(trick.id === 'rodar' ? 1500 : 2000, () => say(`¡Aprendió a ${trick.verb}!`));
       });
       later(4200, () => {
-        S.progress[word].trick = trick.id; S.progress[word].done = true;
+        S.progress[word].trick = trick.id; S.progress[word].done = true; save();
         const c = el('g', { transform: 'translate(1330,360)' }, L.scene);
         const ci = el('g', { cls: 'pop-in' }, c);
         el('rect', { x: -170, y: -150, width: 340, height: 300, rx: 26, fill: '#fff', stroke: C_GOLD, 'stroke-width': 6 }, ci);
@@ -1146,15 +1269,20 @@
   SCREENS.party = function () {
     bgPark({ sky: '#e9e1fb', ground: 700, sun: '#ffd66b' });
     const pup = puppy(L.scene, 760, 820, 0.8);
-    const newFriend = !S.friends.includes('canela');
-    const friend = puppy(L.scene, -150, 830, 0.68, 'canela');
+    const FR = LES.friend;
+    const newFriend = !S.friends.includes(FR);
+    // el resto de la manada también celebra
+    const pack = ['main', ...S.friends].filter((c) => c !== LES.star && c !== FR);
+    const packPups = pack.map((c, i) => puppy(L.scene, 1130 + i * 230, 850, 0.55, c));
+    const friend = puppy(L.scene, -150, 830, 0.68, FR);
     instruction('¡Fiesta! Revienta los globos');
     SFX.fanfare(); pup.happy();
-    const cols = [C_ORANGE, C_BLUE, C_PINK];
+    const cols = [C_ORANGE, C_BLUE, C_PINK, C_PURPLE];
     let popped = 0;
+    const nb = WORDS.length, bsp = nb > 3 ? 360 : 440, bsc = nb > 3 ? 0.8 : 1;
     WORDS.forEach((w, i) => {
-      const x = 360 + i * 440, y = 330;
-      const g = el('g', { transform: `translate(${x},${y})` }, L.scene);
+      const x = 800 - ((nb - 1) * bsp) / 2 + i * bsp, y = 330;
+      const g = el('g', { transform: `translate(${x},${y}) scale(${bsc})` }, L.scene);
       const bb = el('g', { cls: 'bob' }, g);
       bb.style.animationDelay = i * 0.3 + 's';
       el('path', { d: 'M0 150 C 20 200 -20 240 0 300', fill: 'none', stroke: '#8a7d6b', 'stroke-width': 3 }, bb);
@@ -1178,11 +1306,11 @@
     later(1800, () => {
       friend.moveTo(330, 830, 1400, () => {
         friend.happy();
-        if (newFriend) { S.friends.push('canela'); say('¡Llegó Canela, una nueva amiga para tu manada!', { queue: true }); }
+        if (newFriend) { S.friends.push(FR); save(); say(LES.friendSay, { queue: true }); }
       });
     });
     function finale() {
-      pup.trick('bailar'); friend.trick('bailar');
+      pup.trick('bailar'); friend.trick('bailar'); packPups.forEach((pp) => pp.trick('bailar'));
       later(1900, () => {
         const ov = el('g', {}, L.fx);
         el('rect', { width: 1600, height: 900, fill: 'rgba(60,40,20,.35)' }, ov);
@@ -1190,14 +1318,16 @@
         const ci = el('g', { cls: 'pop-in' }, card);
         el('rect', { x: -520, y: -330, width: 1040, height: 640, rx: 40, fill: '#fffdf6', stroke: C_GOLD, 'stroke-width': 10 }, ci);
         el('text', { y: -250, 'text-anchor': 'middle', 'font-size': 52, 'font-weight': 900, fill: C_INK, text: '¡Milana leyó y escribió!' }, ci);
-        WORDS.forEach((w, i) => cursiveWord(ci, w, { cx: -320 + i * 320, baseline: -110, scale: 0.7, sw: 10 }));
+        const fsp = nb > 3 ? 240 : 320;
+        WORDS.forEach((w, i) => cursiveWord(ci, w, { cx: -((nb - 1) * fsp) / 2 + i * fsp, baseline: -110, scale: 0.7, sw: 10 }));
         el('rect', { x: -470, y: -50, width: 940, height: 280, rx: 30, fill: '#dff1fb' }, ci);
         el('rect', { x: -470, y: 150, width: 940, height: 80, rx: 0, fill: '#bfe3b4' }, ci);
-        puppy(ci, -110, 210, 0.62).happy();
-        puppy(ci, 130, 215, 0.55, 'canela');
+        const team = ['main', ...S.friends.filter((c) => c !== 'main')];
+        const tsp = team.length > 2 ? 210 : 240;
+        team.forEach((c, i) => { const pp = puppy(ci, -((team.length - 1) * tsp) / 2 + i * tsp, 212, team.length > 2 ? 0.5 : 0.58, c); if (c === LES.star) pp.happy(); });
         el('text', { x: 0, y: 280, 'text-anchor': 'middle', 'font-size': 28, 'font-weight': 800, fill: '#6b5440', text: 'Milana y su manada' }, ci);
         fxConfetti(800, 200, 40);
-        say('¡Qué orgullo! Milana leyó y escribió mesa, mamá y misa.');
+        say('¡Qué orgullo! Milana leyó y escribió ' + WORDS.slice(0, -1).join(', ') + ' y ' + WORDS[WORDS.length - 1] + '.');
         later(2200, () => {
           const b = button(L.fx, { x: 800, y: 830, w: 320, h: 100, label: 'Terminar', fs: 40, onTap: () => go('close') });
           b.querySelector('.press').classList.add('pulse');
@@ -1226,26 +1356,33 @@
     el('rect', { x: 0, y: 640, width: 1600, height: 260, fill: '#e8c79a' }, L.bg);
     el('rect', { x: 0, y: 630, width: 1600, height: 14, fill: '#d6ae78' }, L.bg);
     instruction('Mi casita: toca un truco');
-    const pup = puppy(L.scene, 1250, 800, 0.85);
-    if (S.friends.includes('canela')) puppy(L.scene, 1480, 815, 0.6, 'canela');
-    el('rect', { x: 120, y: 470, width: 860, height: 20, rx: 8, fill: '#b7895a' }, L.scene);
-    TRICKS.forEach((t, i) => {
-      const w = WORDS[i];
-      const x = 250 + i * 300, y = 330;
-      const got = S.progress[w].trick === t.id;
-      const g = el('g', { transform: `translate(${x},${y})` }, L.scene);
-      if (got) {
-        el('rect', { x: -125, y: -120, width: 250, height: 240, rx: 22, fill: '#fff', stroke: C_GOLD, 'stroke-width': 5 }, g);
-        el('text', { y: -70, 'text-anchor': 'middle', 'font-size': 27, 'font-weight': 900, fill: C_INK, text: t.name }, g);
-        cursiveWord(g, w, { cx: 0, baseline: 50, scale: 0.5, sw: 9 });
-        onTap(g, () => { pup.trick(t.id); say(`${t.name}. Palabra: ${w}.`); });
-      } else {
-        el('rect', { x: -125, y: -120, width: 250, height: 240, rx: 22, fill: 'rgba(255,255,255,.45)', stroke: '#d8c2a0', 'stroke-width': 4, 'stroke-dasharray': '12 10' }, g);
-        const pw = el('g', { transform: 'scale(2.2)', opacity: 0.35 }, g);
-        pawShape(pw, '#b9a27e');
-      }
+    // la manada
+    const team = ['main', ...S.friends.filter((c) => c !== 'main')];
+    const pups = {};
+    const px = [1250, 1460, 1060, 1500];
+    team.forEach((c, i) => { pups[c] = puppy(L.scene, px[i] || 1300, 800 + (i ? 15 : 0), i ? 0.58 : 0.8, c); });
+    LESSONS.forEach((l, r) => {
+      const y = 260 + r * 250, cw = 200, gap = 26, x0 = 130;
+      el('text', { x: x0 - 10, y: y - 105, 'font-size': 24, 'font-weight': 900, fill: '#8a6236', text: `${l.title} · trucos de ${PUP_NAME[l.star] === 'tu perrito' ? 'tu perrito' : PUP_NAME[l.star]}` }, L.scene);
+      el('rect', { x: x0 - 10, y: y + 92, width: l.words.length * (cw + gap), height: 14, rx: 6, fill: '#b7895a' }, L.scene);
+      l.tricks.forEach((t, i) => {
+        const w = l.words[i];
+        const x = x0 + cw / 2 + i * (cw + gap);
+        const got = S.progress[w].trick === t.id;
+        const g = el('g', { transform: `translate(${x},${y})` }, L.scene);
+        if (got) {
+          el('rect', { x: -cw / 2, y: -88, width: cw, height: 176, rx: 20, fill: '#fff', stroke: C_GOLD, 'stroke-width': 5 }, g);
+          el('text', { y: -50, 'text-anchor': 'middle', 'font-size': 23, 'font-weight': 900, fill: C_INK, text: t.name }, g);
+          cursiveWord(g, w, { cx: 0, baseline: 45, scale: 0.42, sw: 9 });
+          onTap(g, () => { const pp = pups[l.star] || pups.main; pp.trick(t.id); say(`${PUP_NAME[l.star] === 'tu perrito' ? '' : PUP_NAME[l.star] + '. '}${t.name}. Palabra: ${w}.`); });
+        } else {
+          el('rect', { x: -cw / 2, y: -88, width: cw, height: 176, rx: 20, fill: 'rgba(255,255,255,.45)', stroke: '#d8c2a0', 'stroke-width': 4, 'stroke-dasharray': '12 10' }, g);
+          const pw = el('g', { transform: 'scale(1.8)', opacity: 0.35 }, g);
+          pawShape(pw, '#b9a27e');
+        }
+      });
     });
-    later(400, () => say('Esta es tu casita. Toca un truco para verlo otra vez.'));
+    later(400, () => say('Esta es tu casita con tu manada. Toca un truco para verlo otra vez.'));
     button(L.scene, { x: 120, y: 820, w: 110, h: 110, fill: '#fff', icon: 'house', iconColor: C_ORANGE, onTap: () => go('map') });
   };
 
@@ -1269,13 +1406,14 @@
     return v;
   }
   function openPanel() {
-    const rows = WORDS.map((w) => {
+    const rows = LESSONS.map((l) => `<tr><td colspan="6" style="font-weight:800;padding-top:10px">${l.title} — ${l.lang === 'en' ? 'imprenta' : 'cursiva Palmer'} · trucos de ${PUP_NAME[l.star]}${S.friends.includes(l.friend) ? ' · llegó ' + l.friendName : ''}</td></tr>` + l.words.map((w) => {
       const p = S.progress[w];
-      const t = TRICKS.find((x) => x.id === p.trick);
-      return `<tr><td class="w">${w}</td><td>${chip(p.find, 'lvl')}</td><td>${chip(p.build, 'lvl')}</td><td>${chip(p.read, 'read')}</td><td>${chip(p.write, 'write')}</td><td>${t ? t.name : '<span class="c-none">—</span>'}</td></tr>`;
-    }).join('');
+      const t = l.tricks.find((x) => x.id === p.trick);
+      const pv = p.prev ? '<span class="chip c-ok">Hecho</span>' : null;
+      return `<tr><td class="w">${w}</td><td>${pv || chip(p.find, 'lvl')}</td><td>${pv || chip(p.build, 'lvl')}</td><td>${pv || chip(p.read, 'read')}</td><td>${pv || chip(p.write, 'write')}</td><td>${t ? t.name : '<span class="c-none">—</span>'}</td></tr>`;
+    }).join('')).join('');
     panel.innerHTML = `<div class="pcard"><h2>Área de papá</h2>
-      <p class="sub">Lista: mesa · mamá · misa — cursiva Palmer. Calentamiento de la m: <b>${S.warmup ? 'hecho' : 'pendiente'}</b>.</p>
+      <p class="sub">Manada: ${['main', ...S.friends].map((c) => c === 'main' ? 'su perrito' : PUP_NAME[c]).join(' · ')}. Calentamiento de la m: <b>${S.warmup ? 'hecho' : 'pendiente'}</b>.</p>
       <table><thead><tr><th>Palabra</th><th>Encontrar</th><th>Armar</th><th>Leer</th><th>Escribir</th><th>Truco</th></tr></thead><tbody>${rows}</tbody></table>
       <div class="prow" style="margin-bottom:14px">
         <label class="ptog"><input type="checkbox" id="tSound" ${S.sound ? 'checked' : ''}> Sonidos y ladridos</label>
@@ -1284,18 +1422,19 @@
       <div class="prow">
         <button class="pbtn pri" id="pClose">Volver al juego</button>
         <button class="pbtn" id="pMap">Ir al parque</button>
-        <button class="pbtn" id="pReset">Empezar de nuevo</button>
+        <button class="pbtn" id="pReset">Repetir ${LES.name} (la manada se queda)</button>
       </div>
-      <p class="pnote">Prototipo: el progreso se guarda mientras la página esté abierta. La voz usa la del navegador; en la versión final irá grabada en español venezolano. Los ladridos son sonidos de prueba.</p></div>`;
+      <p class="pnote">El progreso se guarda en esta pizarra (aunque se cierre la página). La voz usa la del navegador; en la versión final irá grabada en español venezolano. Los ladridos son sonidos de prueba.</p></div>`;
     panel.hidden = false;
-    panel.querySelector('#tSound').addEventListener('change', (e) => (S.sound = e.target.checked));
-    panel.querySelector('#tVoice').addEventListener('change', (e) => { S.voice = e.target.checked; if (!S.voice) hush(); });
+    panel.querySelector('#tSound').addEventListener('change', (e) => { S.sound = e.target.checked; save(); });
+    panel.querySelector('#tVoice').addEventListener('change', (e) => { S.voice = e.target.checked; if (!S.voice) hush(); save(); });
     panel.querySelector('#pClose').addEventListener('click', closePanel);
     panel.querySelector('#pMap').addEventListener('click', () => { closePanel(); go('map'); });
     panel.querySelector('#pReset').addEventListener('click', () => {
-      const keep = { sound: S.sound, voice: S.voice };
-      S = freshState(); S.sound = keep.sound; S.voice = keep.voice;
-      closePanel(); go('home');
+      // Solo reinicia la misión activa. Nunca quita perritos de la manada.
+      LES.words.forEach((w) => { S.progress[w] = blankWord(); });
+      if (LES.warmup) S.warmup = false;
+      save(); closePanel(); go('map');
     });
   }
   function closePanel() { panel.hidden = true; panel.innerHTML = ''; }
@@ -1305,6 +1444,6 @@
   document.addEventListener('gesturestart', (e) => e.preventDefault());
 
   // Atajo de QA: #pantalla
-  window.__mila = { go, S: () => S, setState: (fn) => fn(S) };
+  window.__mila = { go, S: () => S, setState: (fn) => fn(S), setLesson, save, splitLang };
   go('home');
 })();
