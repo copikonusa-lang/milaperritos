@@ -121,3 +121,10 @@ html, body {
 @keyframes sit { 20%,80% { transform: translateY(26px) scale(1.07,.8); } }
 .a-lie { animation: lie 3s ease-in-out 1; }
 @keyframes lie { 25%,80% { transform: translateY(60px) scale(1.32,.52); } }
+.a-spin2 { animation: spin2 1.6s ease-in-out 1; }
+@keyframes spin2 { 25% { transform: scaleX(-1) translateY(-24px); } 50% { transform: scaleX(1) translateY(0); } 75% { transform: scaleX(-1) translateY(-24px); } }
+.rays { animation: rays 14s linear infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes rays { to { transform: rotate(360deg); } }
+.wheel { animation: rays 0.9s linear infinite; transform-box: fill-box; transform-origin: center; }
+.floaty { animation: floaty 2.4s ease-in-out infinite; }
+@keyframes floaty { 50% { transform: translateY(-12px); } }

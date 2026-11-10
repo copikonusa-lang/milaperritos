@@ -46,7 +46,31 @@
         { id: 'saltar', name: 'Saltar', verb: 'saltar' },
       ],
     },
+    {
+      id: 'l3', name: 'Misión 3', title: 'Misión 3 · Español', sub: 'Español · letra cursiva',
+      words: ['sol', 'lata', 'lima', 'moto', 'toma'], warmup: false, lang: 'es',
+      // aprende trucos el último perrito que llegó (Coco); si aún no llegó, Canela
+      get star() { return S && S.friends && S.friends.includes('coco') ? 'coco' : 'canela'; },
+      friend: 'bingo', friendName: 'Bingo', friendSay: '¡Llegó Bingo, un cachorrito nuevo para tu manada! ¡Guau, guau!',
+      distract: { 'sol': 'moto', 'lata': 'lima', 'lima': 'lata', 'moto': 'toma', 'toma': 'moto' },
+      intro: 'Misión 3. Hoy aprendemos sol, lata, lima, moto y toma. ¡Y al final llega una sorpresa a tu manada!',
+      pics: {
+        'sol': '¡El sol! El que sale en el día y nos da luz.',
+        'lata': '¡Una lata! Ahí vienen los refrescos y los jugos.',
+        'lima': '¡Una lima! Una fruta verde y ácida, prima del limón.',
+        'moto': '¡Una moto! Tiene dos ruedas y hace brum, brum.',
+        'toma': '¡Toma! Es lo que dices cuando le das algo a alguien. ¡Toma, un jugo!',
+      },
+      tricks: [
+        { id: 'girar', name: 'Dar vueltas', verb: 'dar vueltas' },
+        { id: 'pelota', name: 'Atrapar la pelota', verb: 'atrapar la pelota' },
+        { id: 'rodar', name: 'Rodar', verb: 'rodar' },
+        { id: 'bailar', name: 'Bailar', verb: 'bailar' },
+        { id: 'patita', name: 'Dar la patita', verb: 'dar la patita' },
+      ],
+    },
   ];
+  const LATEST = 'l3';
   const EN_WORDS = new Set(LESSONS.filter((l) => l.lang === 'en').flatMap((l) => l.words));
   const PRINT_WORDS = EN_WORDS;
   function lessonOf(word) { return LESSONS.find((l) => l.words.includes(word)) || LESSONS[0]; }
@@ -62,7 +86,7 @@
     LESSONS.forEach((l) => l.words.forEach((w) => (p[w] = blankWord())));
     // Misión 1 ya la completó Milana (mesa, mamá, misa) y Canela ya está en su manada.
     LESSONS[0].words.forEach((w, i) => { p[w].done = true; p[w].trick = LESSONS[0].tricks[i].id; p[w].prev = true; });
-    return { warmup: true, progress: p, friends: ['canela'], sound: true, voice: true, lesson: 'l2' };
+    return { warmup: true, progress: p, friends: ['canela'], sound: true, voice: true, lesson: LATEST, latestSeen: LATEST };
   }
   const STORE = 'milaperritos_v2';
   function loadState() {
@@ -80,7 +104,8 @@
   }
   function save() { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch (e) {} }
   let S = loadState();
-  setLesson(S.lesson || 'l2');
+  if (S.latestSeen !== LATEST) { S.latestSeen = LATEST; S.lesson = LATEST; }
+  setLesson(S.lesson || LATEST);
 
   // ------------------------------------------------------------------ Utilidades SVG
   function el(tag, attrs, parent) {
@@ -134,10 +159,10 @@
     return actx;
   }
   const SFX = {
-    yip(delay) {
+    yip(delay, pitch) {
       if (!S.sound) return; const c = ac(); if (!c) return;
       const t = c.currentTime + (delay || 0);
-      const v = 0.85 + Math.random() * 0.3;
+      const v = (0.85 + Math.random() * 0.3) * (pitch || 1);
       const o = c.createOscillator(), g = c.createGain(), f = c.createBiquadFilter();
       f.type = 'bandpass'; f.frequency.value = 1350 * v; f.Q.value = 1.3;
       o.type = 'sawtooth';
@@ -150,6 +175,13 @@
       o.connect(f); f.connect(g); g.connect(c.destination); o.start(t); o.stop(t + 0.2);
     },
     yips(n) { for (let i = 0; i < n; i++) SFX.yip(i * 0.19); },
+    // ladridos de cachorrito: varios ladriditos agudos seguidos, con un gemidito al final
+    puppies(n, delay) {
+      const d0 = delay || 0; n = n || 5;
+      let t = d0;
+      for (let i = 0; i < n; i++) { SFX.yip(t, 1.25 + Math.random() * 0.35); t += i % 2 ? 0.26 : 0.14; }
+      SFX.whine(t + 0.1);
+    },
     whine(delay) {
       if (!S.sound) return; const c = ac(); if (!c) return;
       const t = c.currentTime + (delay || 0);
@@ -353,9 +385,10 @@
     main: { body: '#e8b07a', dark: '#d69a62', ear: '#8b5a2b', light: '#f7dec0', tail: '#c98a4e' },
     canela: { body: '#c9743a', dark: '#b5652f', ear: '#6e3b1a', light: '#f3c9a0', tail: '#a85a28' },
     coco: { body: '#f2ece2', dark: '#ddd2c0', ear: '#4a3a30', light: '#ffffff', tail: '#d8ccb8' },
+    bingo: { body: '#a7afb8', dark: '#929ba5', ear: '#4b525a', light: '#eef1f4', tail: '#868f99' },
   };
-  const COLLAR = { main: '#e25555', canela: C_PURPLE, coco: C_BLUE };
-  const PUP_NAME = { main: 'tu perrito', canela: 'Canela', coco: 'Coco' };
+  const COLLAR = { main: '#e25555', canela: C_PURPLE, coco: C_BLUE, bingo: C_GREEN };
+  const PUP_NAME = { main: 'tu perrito', canela: 'Canela', coco: 'Coco', bingo: 'Bingo' };
   function puppy(parent, x, y, s, coatName) {
     coatName = coatName || LES.star || 'main';
     const coat = COATS[coatName];
@@ -451,6 +484,7 @@
         else if (id === 'sentarse') { P.play('a-sit'); SFX.yip(0.2); later(1700, () => SFX.yip()); }
         else if (id === 'acostarse') { P.play('a-lie'); P.wag('slow'); later(700, () => P.eyes(true)); later(2300, () => { P.eyes(false); SFX.yip(); }); }
         else if (id === 'saltar') { P.play('a-jump'); SFX.yips(3); }
+        else if (id === 'girar') { P.play('a-spin2'); SFX.yips(2); }
       },
     };
     return P;
@@ -459,11 +493,18 @@
   // ------------------------------------------------------------------ Dibujo de palabras en cursiva
   function isPrint(word) { return PRINT_WORDS.has(word); }
   function modFor(word, o) { return (o && o.print != null ? o.print : isPrint(word)) ? Imprenta : C; }
+  function wordAsc(word, M) {
+    if (M === C) return /l/.test(word) ? 224 : /t/.test(word) ? 168 : 106;
+    return /[bdhl]/.test(word) ? 120 : /t/.test(word) ? 104 : 62;
+  }
   function cursiveWord(parent, word, o) {
     o = o || {};
     const M = modFor(word, o);
     const b = M.build(word, { tail: o.tail !== false });
-    const s = (o.scale || 1) * (M === C ? 1 : 0.88);
+    let s = (o.scale || 1) * (M === C ? 1 : 0.88);
+    // letras altas (l, t): se achica la palabra para que quepa en su tarjeta
+    const asc = wordAsc(word, M);
+    if (o.maxAsc && asc * s > o.maxAsc) s = o.maxAsc / asc;
     const sk = Math.tan((M.SLANT * Math.PI) / 180);
     // centro visual: la inclinación desplaza la parte alta hacia la derecha
     const cx = o.cx != null ? o.cx - (b.width * s) / 2 + 50 * s * sk : o.x;
@@ -481,6 +522,79 @@
       });
     }
     return { g, path, b, liftEls, scale: s };
+  }
+  // ------------------------------------------------------------------ Dibujos de las palabras
+  const PIC_SPELL = { s: 'ese', o: 'o', l: 'ele', a: 'a', t: 'te', i: 'i', m: 'eme', e: 'e' };
+  function hasPic(word) { const l = lessonOf(word); return !!(l.pics && l.pics[word]); }
+  function spell(word) { return Array.from(word).map((c) => PIC_SPELL[c] || c).join('... ') + '... ¡' + word + '!'; }
+  function wordPic(parent, word, x, y, sc) {
+    const g = el('g', { transform: `translate(${x},${y}) scale(${sc || 1})` }, parent);
+    const f = el('g', { cls: 'floaty' }, g);
+    if (word === 'sol') {
+      const rays = el('g', { cls: 'rays' }, f);
+      for (let i = 0; i < 12; i++) {
+        const a = (i * 30 * Math.PI) / 180;
+        el('path', { d: 'M -14 -100 L 0 -142 L 14 -100 Z', fill: '#ffb703', transform: `rotate(${i * 30})`, 'stroke-linejoin': 'round', stroke: '#ffb703', 'stroke-width': 8 }, rays);
+      }
+      el('circle', { r: 86, fill: '#ffd23f', stroke: '#f4a300', 'stroke-width': 7 }, f);
+      el('path', { d: 'M-36 -16 Q -26 -30 -16 -16 M16 -16 Q 26 -30 36 -16', fill: 'none', stroke: '#8a4b00', 'stroke-width': 7, 'stroke-linecap': 'round' }, f);
+      el('path', { d: 'M-30 18 Q 0 48 30 18', fill: 'none', stroke: '#8a4b00', 'stroke-width': 7, 'stroke-linecap': 'round' }, f);
+      el('circle', { cx: -52, cy: 10, r: 12, fill: '#ff8a5b', opacity: 0.5 }, f);
+      el('circle', { cx: 52, cy: 10, r: 12, fill: '#ff8a5b', opacity: 0.5 }, f);
+    } else if (word === 'lata') {
+      el('path', { d: 'M -20 -150 L -10 -150 L 6 -118', fill: 'none', stroke: '#ff6fa5', 'stroke-width': 12, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, f);
+      el('ellipse', { cx: 0, cy: 100, rx: 62, ry: 14, fill: '#9aa6b1' }, f);
+      el('rect', { x: -62, y: -100, width: 124, height: 200, rx: 14, fill: '#e63946' }, f);
+      el('path', { d: 'M -62 -10 C -30 -40 30 20 62 -10 L 62 40 C 30 70 -30 10 -62 40 Z', fill: '#fff' }, f);
+      el('circle', { cx: 0, cy: 16, r: 22, fill: '#ff9f1c' }, f);
+      el('path', { d: 'M 0 -6 q 8 -12 18 -10', fill: 'none', stroke: '#3f9f6b', 'stroke-width': 5, 'stroke-linecap': 'round' }, f);
+      el('rect', { x: -44, y: -86, width: 14, height: 160, rx: 7, fill: 'rgba(255,255,255,.25)' }, f);
+      el('ellipse', { cx: 0, cy: -100, rx: 62, ry: 16, fill: '#d5dce2', stroke: '#aab4bd', 'stroke-width': 4 }, f);
+      el('ellipse', { cx: 10, cy: -102, rx: 18, ry: 6, fill: '#aab4bd' }, f);
+    } else if (word === 'lima') {
+      el('path', { d: 'M -20 -60 C -10 -110 40 -120 60 -100 C 40 -70 10 -60 -20 -60 Z', fill: '#3f9f3f' }, f);
+      el('ellipse', { cx: -30, cy: 10, rx: 82, ry: 68, fill: '#7cc142', stroke: '#4f9a2a', 'stroke-width': 6 }, f);
+      el('ellipse', { cx: -58, cy: -16, rx: 22, ry: 12, fill: 'rgba(255,255,255,.4)', transform: 'rotate(-30 -58 -16)' }, f);
+      el('circle', { cx: 70, cy: 50, r: 56, fill: '#d9f2a5', stroke: '#4f9a2a', 'stroke-width': 9 }, f);
+      for (let i = 0; i < 8; i++) el('line', { x1: 70, y1: 50, x2: 70 + Math.cos(i * Math.PI / 4) * 44, y2: 50 + Math.sin(i * Math.PI / 4) * 44, stroke: '#f6fbe6', 'stroke-width': 5, 'stroke-linecap': 'round' }, f);
+      el('circle', { cx: 70, cy: 50, r: 7, fill: '#f6fbe6' }, f);
+    } else if (word === 'moto') {
+      [-88, 88].forEach((wx) => {
+        const w = el('g', { transform: `translate(${wx},56)` }, f);
+        el('circle', { r: 46, fill: '#2b2b2b' }, w);
+        const sp = el('g', { cls: 'wheel' }, w);
+        el('circle', { r: 26, fill: '#c9ced3' }, sp);
+        el('rect', { x: -4, y: -26, width: 8, height: 52, fill: '#7d868f' }, sp);
+        el('rect', { x: -26, y: -4, width: 52, height: 8, fill: '#7d868f' }, sp);
+      });
+      el('path', { d: 'M 88 56 L 52 -46 L 74 -76', fill: 'none', stroke: '#555', 'stroke-width': 10, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, f);
+      el('path', { d: 'M -110 10 C -100 -20 -60 -26 -30 -22 L 40 -22 C 62 -22 74 0 76 20 L -40 30 C -70 30 -100 26 -110 10 Z', fill: '#e63946' }, f);
+      el('path', { d: 'M -40 30 L -88 56 M 20 26 L -10 56 L -88 56', fill: 'none', stroke: '#555', 'stroke-width': 9, 'stroke-linecap': 'round' }, f);
+      el('rect', { x: -78, y: -44, width: 76, height: 22, rx: 11, fill: '#3b2a1a' }, f);
+      el('rect', { x: -10, y: -40, width: 50, height: 22, rx: 10, fill: '#ff6b6b' }, f);
+      el('circle', { cx: 80, cy: -28, r: 15, fill: '#ffd23f', stroke: '#aa8a00', 'stroke-width': 4 }, f);
+      el('rect', { x: 62, y: -86, width: 30, height: 12, rx: 6, fill: '#3b2a1a' }, f);
+      el('path', { d: 'M -140 -10 q -14 6 -26 0 M -146 18 q -14 6 -26 0', fill: 'none', stroke: '#b9a27e', 'stroke-width': 6, 'stroke-linecap': 'round' }, f);
+    } else if (word === 'toma') {
+      el('path', { d: 'M 18 -150 L 30 -150 L 30 -40', fill: 'none', stroke: '#3d8bd8', 'stroke-width': 10, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, f);
+      el('path', { d: 'M -60 -110 L 60 -110 L 48 100 L -48 100 Z', fill: 'rgba(205,232,250,.75)', stroke: '#8fb8d6', 'stroke-width': 6, 'stroke-linejoin': 'round' }, f);
+      el('path', { d: 'M -56 -60 L 56 -60 L 48 96 L -48 96 Z', fill: '#ff9f1c' }, f);
+      el('ellipse', { cx: 0, cy: -60, rx: 56, ry: 8, fill: '#ffb84d' }, f);
+      // mano que ofrece el vaso
+      const SK = '#f1c19b', SKD = '#d99a6c';
+      el('path', { d: 'M -200 60 C -170 40 -120 40 -90 50 L -60 50 L -60 110 L -110 110 C -150 110 -180 100 -200 90 Z', fill: SK, stroke: SKD, 'stroke-width': 4 }, f);
+      [0, 1, 2, 3].forEach((i) => el('rect', { x: -66, y: 4 + i * 26, width: 92, height: 26, rx: 13, fill: SK, stroke: SKD, 'stroke-width': 4 }, f));
+      el('rect', { x: -70, y: -40, width: 26, height: 64, rx: 13, fill: SK, stroke: SKD, 'stroke-width': 4 }, f);
+    }
+    return g;
+  }
+  function revealPic(parent, word, x, y, sc) {
+    const g = wordPic(parent, word, x, y + 60, (sc || 1) * 0.3);
+    tween(650, (k) => {
+      const e = 1 - Math.pow(1 - k, 3);
+      g.setAttribute('transform', `translate(${x},${y + 60 * (1 - e)}) scale(${(sc || 1) * (0.3 + 0.7 * e + Math.sin(k * Math.PI) * 0.12)})`);
+    });
+    return g;
   }
   function drawOn(pathEl, dur, done) {
     const len = pathEl.getTotalLength();
@@ -626,9 +740,21 @@
 
   // ---------------------------------------------------------------- Mapa del parque
   const NODE_POS = [{ x: 250, y: 690 }, { x: 610, y: 520 }, { x: 980, y: 640 }, { x: 1290, y: 440 }, { x: 1450, y: 250 }];
+  const NODE_POS6 = [{ x: 320, y: 690 }, { x: 570, y: 500 }, { x: 830, y: 660 }, { x: 1070, y: 480 }, { x: 1290, y: 640 }, { x: 1460, y: 300 }];
   function nodesFor(l) {
     const keys = l.warmup ? ['warmup', ...l.words, 'party'] : [...l.words, 'party'];
-    return keys.map((k, i) => ({ key: k, x: NODE_POS[i].x, y: NODE_POS[i].y }));
+    const pos = keys.length > 5 ? NODE_POS6 : NODE_POS;
+    return keys.map((k, i) => ({ key: k, x: pos[i].x, y: pos[i].y }));
+  }
+  function mapPath(nodes) {
+    if (nodes.length <= 5) return 'M 140 760 C 300 760 380 560 610 520 S 820 700 980 640 S 1180 430 1290 440 S 1420 300 1450 250';
+    const P = [{ x: 90, y: 790 }, ...nodes];
+    let d = `M ${P[0].x} ${P[0].y}`;
+    for (let i = 0; i < P.length - 1; i++) {
+      const p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(P.length - 1, i + 2)];
+      d += ` C ${p1.x + (p2.x - p0.x) / 6} ${p1.y + (p2.y - p0.y) / 6} ${p2.x - (p3.x - p1.x) / 6} ${p2.y - (p3.y - p1.y) / 6} ${p2.x} ${p2.y}`;
+    }
+    return d;
   }
   function nodeDone(k) { return k === 'warmup' ? S.warmup : k === 'party' ? (S.friends.includes(LES.friend)) : S.progress[k].done; }
   function nextNode() {
@@ -639,7 +765,7 @@
   SCREENS.map = function () {
     bgPark({ ground: 330, noSun: false });
     // camino
-    const d = 'M 140 760 C 300 760 380 560 610 520 S 820 700 980 640 S 1180 430 1290 440 S 1420 300 1450 250';
+    const d = mapPath(nodesFor(LES));
     el('path', { d, fill: 'none', stroke: '#efe0b4', 'stroke-width': 70, 'stroke-linecap': 'round' }, L.scene);
     el('path', { d, fill: 'none', stroke: '#f7ecca', 'stroke-width': 46, 'stroke-linecap': 'round', 'stroke-dasharray': '2 38' }, L.scene);
     const nxt = nextNode();
@@ -648,7 +774,7 @@
     // selector de misiones
     LESSONS.forEach((l, i) => {
       const on = l.id === LES.id, fin = lessonDone(l) && S.friends.includes(l.friend);
-      const bx = 150 + i * 250, by = 200;
+      const bx = 150 + i * 240, by = 200;
       const b = el('g', { transform: `translate(${bx},${by})` }, L.scene);
       const bi = el('g', { cls: 'press' }, b);
       el('rect', { x: -112, y: -40, width: 224, height: 80, rx: 40, fill: on ? C_ORANGE : 'rgba(255,255,255,.9)', stroke: on ? 'none' : '#e1d6c0', 'stroke-width': 3 }, bi);
@@ -691,7 +817,7 @@
     button(L.scene, { x: 120, y: 820, w: 110, h: 110, fill: 'rgba(255,255,255,.9)', icon: 'house', iconColor: C_ORANGE, onTap: () => go('casita') });
     const nW = ['', 'una', 'dos', 'tres', 'cuatro', 'cinco'][WORDS.length];
     instruction(nxt === 'party' ? '¡Lo lograste! Toca la estrella para la fiesta' : 'Toca la huellita que brilla');
-    later(500, () => say(nxt === 'party' ? `¡Terminaste las ${nW} palabras! Toca la estrella para la fiesta.` : (nxt === WORDS[0] && LES.lang === 'en' && !S.progress[nxt].find && S.progress[nxt].find !== 0) ? `${LES.title.replace('·', '.')}. Hoy vamos a aprender palabras en inglés con Canela. Toca la huellita que brilla.` : nxt === 'warmup' ? 'Primero vamos a calentar con la letra m. Toca la huellita que brilla.' : 'Toca la huellita que brilla para la siguiente palabra.'));
+    later(500, () => say(nxt === 'party' ? `¡Terminaste las ${nW} palabras! Toca la estrella para la fiesta.` : (nxt === WORDS[0] && S.progress[nxt].find == null) ? (LES.intro || (LES.lang === 'en' ? `${LES.title.replace('·', '.')}. Hoy vamos a aprender palabras en inglés con Canela.` : LES.title.replace('·', '.'))) + ' Toca la huellita que brilla.' : nxt === 'warmup' ? 'Primero vamos a calentar con la letra m. Toca la huellita que brilla.' : 'Toca la huellita que brilla para la siguiente palabra.'));
   };
   function star(g, x, y, r, color) {
     let d = '';
@@ -710,8 +836,9 @@
     el('rect', { x: 110, y: 150, width: 1380, height: 560, rx: 40, fill: 'none', stroke: '#e5cf9f', 'stroke-width': 4 }, area);
     const PR = isPrint(word);
     const bTmp = modFor(word).build(word);
-    const s = Math.min(2.5, 1150 / bTmp.width);
-    const baseline = PR ? 540 : 520;
+    const cAsc = PR ? 0 : wordAsc(word, C);
+    const baseline = PR ? 540 : cAsc > 150 ? 610 : 520;
+    const s = Math.min(2.5, 1150 / bTmp.width, PR ? 9 : (baseline - 185) / cAsc);
     el('line', { x1: 160, y1: baseline, x2: 1440, y2: baseline, stroke: '#d8c49a', 'stroke-width': 3 }, area);
     if (PR) {
       const se = s * 0.88, by = baseline - 6 * se;
@@ -916,7 +1043,7 @@
       const shakeG = el('g', {}, g);
       const glowR = el('rect', { x: -250, y: -150, width: 500, height: 300, rx: 40, fill: 'none', stroke: C_GOLD, 'stroke-width': 14, opacity: 0 }, shakeG);
       const bg = el('rect', { x: -230, y: -130, width: 460, height: 260, rx: 34, fill: '#fff', stroke: '#e3d6bf', 'stroke-width': 4 }, shakeG);
-      cursiveWord(shakeG, w, { cx: 0, baseline: 50, scale: 0.95, sw: 10 });
+      cursiveWord(shakeG, w, { cx: 0, baseline: 60, scale: 0.95, sw: 10, maxAsc: 170 });
       const card = { w, g, shakeG, bg, glowR };
       onTap(g, () => choose(card));
       return card;
@@ -968,7 +1095,7 @@
     // modelo
     const modelG = el('g', {}, L.scene);
     el('rect', { x: 500, y: 150, width: 600, height: 150, rx: 30, fill: '#fff', stroke: '#efdfbf', 'stroke-width': 3 }, modelG);
-    cursiveWord(modelG, word, { cx: 800, baseline: 265, scale: 0.78, sw: 8, color: '#b9a98a' });
+    cursiveWord(modelG, word, { cx: 800, baseline: 268, scale: 0.78, sw: 8, color: '#b9a98a', maxAsc: 104 });
     // casillas
     const SW = 180, GAP = 28;
     const totalW = n * SW + (n - 1) * GAP;
@@ -990,7 +1117,7 @@
     }
     const TW = 160;
     const trayW = n * TW + (n - 1) * 40 + 80;
-    el('rect', { x: 800 - trayW / 2, y: 590, width: trayW, height: 180, rx: 90, fill: '#f1dfc0' }, L.scene);
+    const trayR = el('rect', { x: 800 - trayW / 2, y: 590, width: trayW, height: 180, rx: 90, fill: '#f1dfc0' }, L.scene);
     const tiles = order.map((li, j) => {
       const ch = letters[li];
       const hx = 800 - (n * TW + (n - 1) * 40) / 2 + TW / 2 + j * (TW + 40), hy = 680;
@@ -998,7 +1125,7 @@
       const inner = el('g', {}, g);
       const box = el('rect', { x: -TW / 2, y: -TW / 2, width: TW, height: TW, rx: 28, fill: '#fff', stroke: C_ORANGE, 'stroke-width': 4 }, inner);
       el('rect', { x: -TW / 2 + 8, y: TW / 2 - 14, width: TW - 16, height: 8, rx: 4, fill: 'rgba(0,0,0,.06)' }, inner);
-      cursiveWord(inner, ch, { cx: 0, baseline: 40, scale: ch === 'm' ? 0.8 : 0.95, sw: 11, tail: false, print: isPrint(word) });
+      cursiveWord(inner, ch, { cx: 0, baseline: /[lt]/.test(ch) && !isPrint(word) ? 56 : 40, scale: ch === 'm' ? 0.8 : 0.95, sw: 11, tail: false, print: isPrint(word), maxAsc: 124 });
       const t = { ch, g, inner, box, hx, hy, x: hx, y: hy, placed: false };
       g.style.touchAction = 'none';
       return t;
@@ -1117,14 +1244,31 @@
       later(450, () => {
         tiles.forEach((t) => t.g.setAttribute('opacity', 0));
         slots.forEach((s) => s.g.setAttribute('opacity', 0.25));
-        const big = cursiveWord(L.scene, word, { cx: 800, baseline: 520, scale: 1.45, sw: 12, color: C_INK });
+        const PIC = hasPic(word);
+        if (PIC) { slots.forEach((x) => x.g.setAttribute('opacity', 0)); trayR.setAttribute('opacity', 0); modelG.setAttribute('opacity', 0); }
+        const big = cursiveWord(L.scene, word, { cx: PIC ? 560 : 800, baseline: PIC ? 580 : 520, scale: PIC ? 1.25 : 1.45, sw: 12, color: C_INK, maxAsc: 300 });
         big.liftEls.forEach((x) => x.setAttribute('opacity', 0));
         say(isPrint(word) ? '¡Armaste la palabra!' : '¡Las letras se dieron la mano!');
         drawOn(big.path, 1700, () => {
           big.liftEls.forEach((x) => x.setAttribute('opacity', 1));
-          pup.happy(); fxStars(800, 430);
-          later(900, () => say(word));
-          later(2600, () => nextStation(word, 1));
+          pup.happy(); fxStars(PIC ? 560 : 800, 430);
+          if (!PIC) {
+            later(900, () => say(word));
+            later(2600, () => nextStation(word, 1));
+            return;
+          }
+          // deletrea, aparece el dibujo y los perritos ladran contentos
+          let shown = false, left = false;
+          const show = () => {
+            if (shown) return; shown = true;
+            revealPic(L.scene, word, 1170, 450, 1.5);
+            SFX.sparkle(); SFX.puppies(5, 0.1); fxConfetti(1180, 380, 22);
+            say(lessonOf(word).pics[word], { queue: true, onend: () => later(1400, leave) });
+            later(8000, leave); // por si la voz no avisa que terminó
+          };
+          const leave = () => { if (left) return; left = true; nextStation(word, 1); };
+          later(700, () => say(spell(word), { rate: 0.8, onend: show }));
+          later(4000, show);
         });
       });
     }
@@ -1138,7 +1282,7 @@
     bgPlain('#f3efe6');
     stationDots(2);
     el('rect', { x: 230, y: 150, width: 1140, height: 540, rx: 44, fill: '#fff' }, L.scene);
-    const w = cursiveWord(L.scene, word, { cx: 800, baseline: 500, scale: 1.75, sw: 12, color: '#1f160e' });
+    const w = cursiveWord(L.scene, word, { cx: 800, baseline: /[lt]/.test(word) && !isPrint(word) ? 560 : 500, scale: 1.75, sw: 12, color: '#1f160e', maxAsc: 360 });
     const prompt = 'Ahora léela con papá.';
     let firstPart = null, done = false;
     // franja de papá
@@ -1193,7 +1337,14 @@
     const prompt = `Escribe ${word} en cursiva. Empieza en el punto verde y sigue a tu perrito sin levantar el dedo.`;
     const tb = traceBoard(word, {
       onActivity: () => armIdle(10000, idleHint),
-      onLift: () => say(word === 'misa' ? 'Ahora el puntito de la i. Toca la mariposa.' : word === 'mamá' ? 'Ahora la rayita de la a. Toca la mariposa.' : word.includes('t') ? 'Ahora la rayita de la t. Toca la mariposa.' : ''),
+      onLift: () => {
+        const ty = modFor(word).build(word).lifts.map((l) => l.type);
+        const parts = [];
+        if (ty.includes('dot')) parts.push('el puntito de la i');
+        if (ty.includes('accent')) parts.push('la rayita de la a');
+        if (ty.includes('cross')) parts.push('la rayita de la t');
+        say('Ahora ' + parts.join(' y ') + '. Toca ' + (ty.length > 1 ? 'las mariposas.' : 'la mariposa.'));
+      },
       onDone: () => {
         stopIdle();
         S.progress[word].write = demoUsed ? 'demo' : hint ? 'pista' : 'sola';
@@ -1239,6 +1390,7 @@
       lid.setAttribute('class', 'lid-open');
       fxHearts(560, 560, 6); SFX.fanfare();
       pup.happy();
+      if (hasPic(word)) { later(500, () => { revealPic(L.scene, word, 260, 400, 0.75); SFX.puppies(4, 0.2); }); }
       capT.remove();
       instruction('¡Tu perrito está feliz!');
       say('¡Guau! ¡Tu perrito está feliz!');
@@ -1254,7 +1406,7 @@
         el('text', { y: -96, 'text-anchor': 'middle', 'font-size': 26, 'font-weight': 900, fill: '#9a6b12', text: `Truco ${idx + 1}` }, ci);
         el('text', { y: -52, 'text-anchor': 'middle', 'font-size': 32, 'font-weight': 900, fill: C_INK, text: trick.name }, ci);
         el('line', { x1: -130, x2: 130, y1: -20, y2: -20, stroke: '#f0e3c4', 'stroke-width': 3 }, ci);
-        cursiveWord(ci, word, { cx: 0, baseline: 80, scale: 0.62, sw: 9 });
+        cursiveWord(ci, word, { cx: 0, baseline: 95, scale: 0.62, sw: 9, maxAsc: 105 });
         SFX.sparkle();
         later(1400, () => {
           const last = WORDS.every((w) => S.progress[w].done);
@@ -1277,9 +1429,9 @@
     const friend = puppy(L.scene, -150, 830, 0.68, FR);
     instruction('¡Fiesta! Revienta los globos');
     SFX.fanfare(); pup.happy();
-    const cols = [C_ORANGE, C_BLUE, C_PINK, C_PURPLE];
+    const cols = [C_ORANGE, C_BLUE, C_PINK, C_PURPLE, C_GREEN];
     let popped = 0;
-    const nb = WORDS.length, bsp = nb > 3 ? 360 : 440, bsc = nb > 3 ? 0.8 : 1;
+    const nb = WORDS.length, bsp = nb > 4 ? 290 : nb > 3 ? 360 : 440, bsc = nb > 4 ? 0.68 : nb > 3 ? 0.8 : 1;
     WORDS.forEach((w, i) => {
       const x = 800 - ((nb - 1) * bsp) / 2 + i * bsp, y = 330;
       const g = el('g', { transform: `translate(${x},${y}) scale(${bsc})` }, L.scene);
@@ -1289,7 +1441,7 @@
       el('ellipse', { cx: 0, cy: 0, rx: 175, ry: 150, fill: cols[i] }, bb);
       el('path', { d: 'M-12 148 L12 148 L0 166z', fill: cols[i] }, bb);
       el('ellipse', { cx: -70, cy: -70, rx: 30, ry: 18, fill: 'rgba(255,255,255,.35)', transform: 'rotate(-30 -70 -70)' }, bb);
-      cursiveWord(bb, w, { cx: 0, baseline: 40, scale: 0.75, sw: 11, color: '#fff' });
+      cursiveWord(bb, w, { cx: 0, baseline: 50, scale: 0.75, sw: 11, color: '#fff', maxAsc: 150 });
       let gone = false;
       onTap(g, () => {
         if (gone) return; gone = true;
@@ -1307,6 +1459,7 @@
       friend.moveTo(330, 830, 1400, () => {
         friend.happy();
         if (newFriend) { S.friends.push(FR); save(); say(LES.friendSay, { queue: true }); }
+        SFX.puppies(6, 0.2);
       });
     });
     function finale() {
@@ -1318,8 +1471,8 @@
         const ci = el('g', { cls: 'pop-in' }, card);
         el('rect', { x: -520, y: -330, width: 1040, height: 640, rx: 40, fill: '#fffdf6', stroke: C_GOLD, 'stroke-width': 10 }, ci);
         el('text', { y: -250, 'text-anchor': 'middle', 'font-size': 52, 'font-weight': 900, fill: C_INK, text: '¡Milana leyó y escribió!' }, ci);
-        const fsp = nb > 3 ? 240 : 320;
-        WORDS.forEach((w, i) => cursiveWord(ci, w, { cx: -((nb - 1) * fsp) / 2 + i * fsp, baseline: -110, scale: 0.7, sw: 10 }));
+        const fsp = nb > 4 ? 200 : nb > 3 ? 240 : 320;
+        WORDS.forEach((w, i) => cursiveWord(ci, w, { cx: -((nb - 1) * fsp) / 2 + i * fsp, baseline: -100, scale: nb > 4 ? 0.5 : 0.7, sw: 10, maxAsc: 120 }));
         el('rect', { x: -470, y: -50, width: 940, height: 280, rx: 30, fill: '#dff1fb' }, ci);
         el('rect', { x: -470, y: 150, width: 940, height: 80, rx: 0, fill: '#bfe3b4' }, ci);
         const team = ['main', ...S.friends.filter((c) => c !== 'main')];
@@ -1359,25 +1512,27 @@
     // la manada
     const team = ['main', ...S.friends.filter((c) => c !== 'main')];
     const pups = {};
-    const px = [1250, 1460, 1060, 1500];
-    team.forEach((c, i) => { pups[c] = puppy(L.scene, px[i] || 1300, 800 + (i ? 15 : 0), i ? 0.58 : 0.8, c); });
+    const px = [1180, 1370, 1510, 990, 1290];
+    team.forEach((c, i) => { pups[c] = puppy(L.scene, px[i] || 1300, 800 + (i ? 15 : 0), i ? 0.52 : 0.72, c); });
+    const compact = LESSONS.length > 2;
     LESSONS.forEach((l, r) => {
-      const y = 260 + r * 250, cw = 200, gap = 26, x0 = 130;
-      el('text', { x: x0 - 10, y: y - 105, 'font-size': 24, 'font-weight': 900, fill: '#8a6236', text: `${l.title} · trucos de ${PUP_NAME[l.star] === 'tu perrito' ? 'tu perrito' : PUP_NAME[l.star]}` }, L.scene);
-      el('rect', { x: x0 - 10, y: y + 92, width: l.words.length * (cw + gap), height: 14, rx: 6, fill: '#b7895a' }, L.scene);
+      const y = compact ? 200 + r * 195 : 260 + r * 250, cw = compact ? 176 : 200, gap = compact ? 18 : 26, x0 = 130;
+      el('text', { x: x0 - 10, y: y - (compact ? 82 : 105), 'font-size': compact ? 21 : 24, 'font-weight': 900, fill: '#8a6236', text: `${l.title} · trucos de ${PUP_NAME[l.star] === 'tu perrito' ? 'tu perrito' : PUP_NAME[l.star]}` }, L.scene);
+      const ch = compact ? 140 : 176;
+      el('rect', { x: x0 - 10, y: y + ch / 2 + 4, width: l.words.length * (cw + gap), height: 14, rx: 6, fill: '#b7895a' }, L.scene);
       l.tricks.forEach((t, i) => {
         const w = l.words[i];
         const x = x0 + cw / 2 + i * (cw + gap);
         const got = S.progress[w].trick === t.id;
         const g = el('g', { transform: `translate(${x},${y})` }, L.scene);
         if (got) {
-          el('rect', { x: -cw / 2, y: -88, width: cw, height: 176, rx: 20, fill: '#fff', stroke: C_GOLD, 'stroke-width': 5 }, g);
-          el('text', { y: -50, 'text-anchor': 'middle', 'font-size': 23, 'font-weight': 900, fill: C_INK, text: t.name }, g);
-          cursiveWord(g, w, { cx: 0, baseline: 45, scale: 0.42, sw: 9 });
+          el('rect', { x: -cw / 2, y: -ch / 2, width: cw, height: ch, rx: 20, fill: '#fff', stroke: C_GOLD, 'stroke-width': 5 }, g);
+          el('text', { y: compact ? -38 : -50, 'text-anchor': 'middle', 'font-size': compact ? 19 : 23, 'font-weight': 900, fill: C_INK, text: t.name }, g);
+          cursiveWord(g, w, { cx: 0, baseline: compact ? 42 : 45, scale: compact ? 0.34 : 0.42, sw: 9 });
           onTap(g, () => { const pp = pups[l.star] || pups.main; pp.trick(t.id); say(`${PUP_NAME[l.star] === 'tu perrito' ? '' : PUP_NAME[l.star] + '. '}${t.name}. Palabra: ${w}.`); });
         } else {
-          el('rect', { x: -cw / 2, y: -88, width: cw, height: 176, rx: 20, fill: 'rgba(255,255,255,.45)', stroke: '#d8c2a0', 'stroke-width': 4, 'stroke-dasharray': '12 10' }, g);
-          const pw = el('g', { transform: 'scale(1.8)', opacity: 0.35 }, g);
+          el('rect', { x: -cw / 2, y: -ch / 2, width: cw, height: ch, rx: 20, fill: 'rgba(255,255,255,.45)', stroke: '#d8c2a0', 'stroke-width': 4, 'stroke-dasharray': '12 10' }, g);
+          const pw = el('g', { transform: compact ? 'scale(1.4)' : 'scale(1.8)', opacity: 0.35 }, g);
           pawShape(pw, '#b9a27e');
         }
       });

@@ -55,7 +55,45 @@
         ['C', 24, -2, 34, 0, 46, 0],
       ],
     },
+    // o: termina arriba (enlace alto, como en Palmer)
+    o: {
+      w: 72, endHigh: true,
+      hi: ['C', 10, -96, 24, -100, 36, -98],
+      s: [
+        ['C', 4, -30, 10, -84, 36, -98],
+        ['C', 18, -102, 4, -80, 6, -48],
+        ['C', 8, -10, 34, 2, 48, -18],
+        ['C', 58, -34, 56, -82, 36, -98],
+        ['C', 52, -93, 60, -90, 72, -90],
+      ],
+    },
+    // l: lazo alto
+    l: {
+      w: 60,
+      hi: ['C', 10, -110, 32, -150, 40, -190],
+      s: [
+        ['C', 16, -50, 40, -140, 40, -190],
+        ['C', 40, -222, 14, -222, 16, -186],
+        ['C', 18, -130, 20, -50, 22, -14],
+        ['C', 24, -2, 40, 0, 60, 0],
+      ],
+    },
+    // t: sube, baja por el mismo camino; la rayita va después
+    t: {
+      w: 56,
+      hi: ['C', 12, -110, 24, -140, 30, -166],
+      s: [
+        ['C', 12, -50, 26, -128, 30, -166],
+        ['C', 28, -120, 24, -50, 26, -14],
+        ['C', 28, -2, 40, 0, 56, 0],
+      ],
+    },
   };
+  G.m.hi = ['C', 8, -92, 16, -99, 22, -98];
+  G.a.hi = ['C', 10, -90, 24, -94, 34, -96];
+  G.i.hi = ['C', 10, -92, 18, -96, 24, -100];
+  G.e.hi = ['C', 16, -80, 40, -60, 42, -56];
+  G.s.hi = ['C', 12, -92, 22, -98, 28, -104];
 
   const BASE = { 'á': 'a' };
 
@@ -66,22 +104,29 @@
     let d = 'M 0 0';
     const lifts = [];
     const ranges = [];
+    let high = false;
     for (const ch of word) {
       const k = BASE[ch] || ch;
       const g = G[k];
       if (!g) continue;
       const start = ox;
-      for (const seg of g.s) {
+      g.s.forEach((seg0, si) => {
+        const seg = si === 0 && high && g.hi ? g.hi : seg0;
         if (seg[0] === 'C') {
           d += ` C ${seg[1] + ox} ${seg[2]} ${seg[3] + ox} ${seg[4]} ${seg[5] + ox} ${seg[6]}`;
         }
-      }
+      });
+      high = !!g.endHigh;
+      if (k === 't') lifts.push({ type: 'cross', x1: ox + 8, y1: -112, x2: ox + 54, y2: -112 });
       if (k === 'i') lifts.push({ type: 'dot', x: ox + 30, y: -138 });
       if (ch === 'á') lifts.push({ type: 'accent', x1: ox + 30, y1: -120, x2: ox + 46, y2: -146 });
       ox += g.w;
       ranges.push({ ch, x0: start, x1: ox });
     }
-    if (tail) {
+    if (tail && high) {
+      d += ` C ${ox + 8} -90 ${ox + 16} -92 ${ox + 24} -96`;
+      ox += 24;
+    } else if (tail) {
       d += ` C ${ox + 18} 0 ${ox + 34} -4 ${ox + 50} -14`;
       ox += 50;
     }
