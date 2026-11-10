@@ -270,12 +270,47 @@
     return parts;
   }
   if ('speechSynthesis' in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+  // Voz grabada (natural): cada frase tiene su audio en audio/<hash>.mp3
+  function clipId(t) { let h = 5381; for (let i = 0; i < t.length; i++) h = ((h * 33) ^ t.charCodeAt(i)) >>> 0; return h.toString(16); }
+  let CLIPS = null; const clipURL = {};
+  const player = new Audio(); player.preload = 'auto';
+  let aq = [], aCur = null, aGuard = null;
+  fetch('audio/manifest.json').then((r) => r.json()).then((m) => { CLIPS = new Set(m); }).catch(() => { CLIPS = new Set(); });
+  function preloadClips() {
+    if (!CLIPS || preloadClips.done) return; preloadClips.done = true;
+    const ids = Array.from(CLIPS); let k = 0;
+    const next = () => { const id = ids[k++]; if (!id) return; fetch('audio/' + id + '.mp3').then((r) => r.blob()).then((b) => { clipURL[id] = URL.createObjectURL(b); }).catch(() => {}).finally(next); };
+    for (let i = 0; i < 4; i++) next();
+  }
+  function aNext() {
+    if (aGuard) { clearTimeout(aGuard); aGuard = null; }
+    const it = aq.shift(); aCur = it || null;
+    if (!it) return;
+    const fin = () => { if (aCur !== it) return; aCur = null; if (it.onend) it.onend(); aNext(); };
+    player.onended = fin; player.onerror = () => later(600, fin);
+    player.src = clipURL[it.id] || ('audio/' + it.id + '.mp3');
+    const pr = player.play(); if (pr && pr.catch) pr.catch(() => later(900, fin));
+    aGuard = setTimeout(fin, 15000);
+  }
+  function audioStop() { aq = []; aCur = null; if (aGuard) { clearTimeout(aGuard); aGuard = null; } try { player.pause(); } catch (e) {} }
   function say(text, opts) {
     opts = opts || {};
     text = starText(text);
-    if (!S.voice || !('speechSynthesis' in window)) { if (opts.onend) later(900, opts.onend); return; }
+    (window.__said = window.__said || new Set()).add(text);
+    if (!S.voice) { if (opts.onend) later(900, opts.onend); return; }
+    const id = clipId(text);
+    if (CLIPS && CLIPS.has(id)) {
+      try { if ('speechSynthesis' in window) speechSynthesis.cancel(); } catch (e) {}
+      if (!opts.queue) audioStop();
+      aq.push({ id, onend: opts.onend });
+      if (!aCur) aNext();
+      return;
+    }
+    (window.__missing = window.__missing || new Set()).add(text);
+    // sin audio grabado: solo usamos la voz del equipo si tiene voz en español (si no, mejor silencio que voz robótica en inglés)
+    if (!esVoice || !('speechSynthesis' in window)) { if (opts.onend) later(900, opts.onend); return; }
     try {
-      if (!opts.queue) speechSynthesis.cancel();
+      if (!opts.queue) { speechSynthesis.cancel(); audioStop(); }
       const parts = splitLang(text);
       parts.forEach((pt, i) => {
         const u = new SpeechSynthesisUtterance(pt.t);
@@ -284,16 +319,15 @@
           if (enVoice) u.voice = enVoice;
           u.rate = 0.72; u.pitch = 1.05;
         } else {
-          u.lang = esVoice ? esVoice.lang : 'es-VE';
-          if (esVoice) u.voice = esVoice;
+          u.lang = esVoice.lang; u.voice = esVoice;
           u.rate = opts.rate || 0.88; u.pitch = 1.08;
         }
         if (opts.onend && i === parts.length - 1) u.onend = opts.onend;
         speechSynthesis.speak(u);
       });
-    } catch (e) { /* sin voz */ }
+    } catch (e) { if (opts.onend) later(900, opts.onend); }
   }
-  function hush() { try { if ('speechSynthesis' in window) speechSynthesis.cancel(); } catch (e) {} }
+  function hush() { audioStop(); try { if ('speechSynthesis' in window) speechSynthesis.cancel(); } catch (e) {} }
 
   // ------------------------------------------------------------------ Entrada táctil
   let lockUntil = 0;
@@ -729,7 +763,7 @@
       x: 800, y: 800, w: 680, h: 120, label: '¡Vamos a jugar, Milana!', fs: 48,
       onTap: () => {
         if (started) return; started = true;
-        ac(); zt.remove();
+        ac(); zt.remove(); preloadClips();
         pup.sleep(false); pup.ears(); pup.happy();
         say('¡Hola, Milana! ¡Vamos a jugar!');
         later(2000, () => go('map'));
@@ -817,7 +851,7 @@
     button(L.scene, { x: 120, y: 820, w: 110, h: 110, fill: 'rgba(255,255,255,.9)', icon: 'house', iconColor: C_ORANGE, onTap: () => go('casita') });
     const nW = ['', 'una', 'dos', 'tres', 'cuatro', 'cinco'][WORDS.length];
     instruction(nxt === 'party' ? '¡Lo lograste! Toca la estrella para la fiesta' : 'Toca la huellita que brilla');
-    later(500, () => say(nxt === 'party' ? `¡Terminaste las ${nW} palabras! Toca la estrella para la fiesta.` : (nxt === WORDS[0] && S.progress[nxt].find == null) ? (LES.intro || (LES.lang === 'en' ? `${LES.title.replace('·', '.')}. Hoy vamos a aprender palabras en inglés con Canela.` : LES.title.replace('·', '.'))) + ' Toca la huellita que brilla.' : nxt === 'warmup' ? 'Primero vamos a calentar con la letra m. Toca la huellita que brilla.' : 'Toca la huellita que brilla para la siguiente palabra.'));
+    later(500, () => say(nxt === 'party' ? `¡Terminaste las ${nW} palabras! Toca la estrella para la fiesta.` : (nxt === WORDS[0] && S.progress[nxt].find == null) ? lessonIntro(LES) : nxt === 'warmup' ? 'Primero vamos a calentar con la letra m. Toca la huellita que brilla.' : 'Toca la huellita que brilla para la siguiente palabra.'));
   };
   function star(g, x, y, r, color) {
     let d = '';
@@ -1334,7 +1368,7 @@
     instruction('Escribe ' + 'la palabra: sigue a tu perrito');
     const pup = puppy(L.scene, 1440, 880, 0.48);
     let hint = 0, demoUsed = false;
-    const prompt = `Escribe ${word} en cursiva. Empieza en el punto verde y sigue a tu perrito sin levantar el dedo.`;
+    const prompt = `Escribe ${word}${isPrint(word) ? '' : ' en cursiva'}. Empieza en el punto verde y sigue a tu perrito sin levantar el dedo.`;
     const tb = traceBoard(word, {
       onActivity: () => armIdle(10000, idleHint),
       onLift: () => {
@@ -1599,6 +1633,51 @@
   document.addEventListener('gesturestart', (e) => e.preventDefault());
 
   // Atajo de QA: #pantalla
-  window.__mila = { go, S: () => S, setState: (fn) => fn(S), setLesson, save, splitLang };
+
+  function lessonIntro(l) { return (l.intro || (l.lang === 'en' ? `${l.title.replace(' · ', '. ')}. Hoy vamos a aprender palabras en inglés con Canela.` : `${l.title.replace(' · ', '. ')}.`)) + ' Toca la huellita que brilla.'; }
+  // Catálogo de todas las frases (para grabar la voz)
+  function allPhrases() {
+    const out = new Set();
+    const sub = (t, star) => star === 'main' ? t : t.replace(/Tu perrito/g, PUP_NAME[star]).replace(/tu perrito/g, PUP_NAME[star]);
+    const stars = ['main', 'canela', 'coco'];
+    const add = (t, ss) => (ss || stars).forEach((st) => out.add(sub(t, st)));
+    add('¡Hola, Milana! ¡Vamos a jugar!');
+    add('Toca la huellita que brilla para la siguiente palabra.');
+    add('Primero vamos a calentar con la letra m. Toca la huellita que brilla.');
+    ['Ahora el puntito. Toca la mariposa.', '¡Ya conoces la m! ¡Muy bien!', '¡Muy bien!', 'Pon tu dedo en el punto verde y sigue a tu perrito.', 'Mira cómo se hace.',
+      'Vamos a escribir la letra m en cursiva. Empieza en el punto verde, sube, y sigue a tu perrito.', 'Esta huellita va primero.', 'Esta letra va ahí.', 'Mira, así.',
+      '¡Armaste la palabra!', '¡Las letras se dieron la mano!', 'Ahora léela con papá.', '¡Guau! ¡Tu perrito está feliz!',
+      '¡Fiesta, Milana! Revienta los globos con tus palabras.', '¡Qué buena aventura, Milana! Tu perrito se va a descansar. Mañana te espera.',
+      'Esta es tu casita con tu manada. Toca un truco para verlo otra vez.'].forEach((t) => add(t));
+    WARM.slice(1).forEach((it) => add('Ahora unimos la m: ' + it + '.'));
+    LESSONS.forEach((l) => {
+      const ss = l.id === 'l1' ? ['main'] : l.id === 'l2' ? ['canela'] : ['canela', 'coco'];
+      const W = l.words;
+      add(`¡Terminaste las ${['', 'una', 'dos', 'tres', 'cuatro', 'cinco'][W.length]} palabras! Toca la estrella para la fiesta.`, ss);
+      add(lessonIntro(l), ss);
+      add(l.friendSay, ss);
+      add('¡Qué orgullo! Milana leyó y escribió ' + W.slice(0, -1).join(', ') + ' y ' + W[W.length - 1] + '.', ss);
+      l.tricks.forEach((t, i) => { add(`¡Aprendió a ${t.verb}!`, ss); out.add(`${PUP_NAME[ss[0]] === 'tu perrito' ? '' : PUP_NAME[ss[0]] + '. '}${t.name}. Palabra: ${W[i]}.`); if (ss[1]) out.add(`${PUP_NAME[ss[1]]}. ${t.name}. Palabra: ${W[i]}.`); });
+      W.forEach((word) => {
+        add(`Tu perrito busca la palabra ${word}. ¿Dónde está?`, stars);
+        add(`¡Sí! Aquí dice ${word}.`); add('Mmm. Escucha otra vez: ' + word); add('Mira la que brilla. Ahí dice ' + word + '.');
+        add(`Vamos a armar ${word}. Pon cada letra en su huellita, empezando por la izquierda.`);
+        add(word); add(word + '. ¡Muy bien!'); add(`¡Escribiste ${word}!`);
+        add(`Escribe ${word}${isPrint(word) ? '' : ' en cursiva'}. Empieza en el punto verde y sigue a tu perrito sin levantar el dedo.`, stars);
+        add(`¡Completaste la palabra ${word}! Tu perrito aprendió algo nuevo. Toca la caja.`, stars);
+        if (l.pics && l.pics[word]) { add(spell(word)); add(l.pics[word]); }
+        const ty = modFor(word).build(word).lifts.map((x) => x.type);
+        if (ty.length) {
+          const parts = [];
+          if (ty.includes('dot')) parts.push('el puntito de la i');
+          if (ty.includes('accent')) parts.push('la rayita de la a');
+          if (ty.includes('cross')) parts.push('la rayita de la t');
+          add('Ahora ' + parts.join(' y ') + '. Toca ' + (ty.length > 1 ? 'las mariposas.' : 'la mariposa.'));
+        }
+      });
+    });
+    return Array.from(out).map((t) => ({ t, id: clipId(t) }));
+  }
+  window.__mila = { allPhrases, go, S: () => S, setState: (fn) => fn(S), setLesson, save, splitLang };
   go('home');
 })();
