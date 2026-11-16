@@ -876,9 +876,9 @@
   function traceBoard(word, o) {
     o = o || {};
     const bg = el('g', {}, L.scene);
-    el('rect', { x: 110, y: 230, width: 1380, height: 500, rx: 40, fill: '#f4e3bf' }, bg);
-    el('rect', { x: 110, y: 230, width: 1380, height: 500, rx: 40, fill: 'none', stroke: '#e5cf9f', 'stroke-width': 4 }, bg);
-    el('line', { x1: 800, y1: 270, x2: 800, y2: 690, stroke: '#e5cf9f', 'stroke-width': 4, 'stroke-dasharray': '10 14' }, bg);
+    el('rect', { x: 110, y: 290, width: 1380, height: 460, rx: 40, fill: '#f4e3bf' }, bg);
+    el('rect', { x: 110, y: 290, width: 1380, height: 460, rx: 40, fill: 'none', stroke: '#e5cf9f', 'stroke-width': 4 }, bg);
+    el('line', { x1: 800, y1: 330, x2: 800, y2: 715, stroke: '#e5cf9f', 'stroke-width': 4, 'stroke-dasharray': '10 14' }, bg);
     let active = 0;
     const halves = [0, 1].map((i) => traceOne(word, Object.assign({}, o, {
       cx: i ? 1145 : 455, x1: i ? 830 : 140, x2: i ? 1460 : 770, inactive: i === 1,
@@ -904,8 +904,8 @@
     const PR = isPrint(word);
     const bTmp = modFor(word).build(word);
     const cAsc = PR ? 0 : wordAsc(word, C);
-    const baseline = PR ? 600 : cAsc > 150 ? 630 : 590;
-    const s = Math.min(1.45, 580 / bTmp.width, PR ? 9 : 260 / cAsc);
+    const baseline = PR ? 670 : cAsc > 150 ? 690 : 660;
+    const s = Math.min(1.1, 440 / bTmp.width, PR ? 9 : 195 / cAsc);
     el('line', { x1: X1, y1: baseline, x2: X2, y2: baseline, stroke: '#d8c49a', 'stroke-width': 3 }, area);
     if (PR) {
       const se = s * 0.88, by = baseline - 6 * se;
@@ -955,7 +955,7 @@
       const sp = stage.createSVGPoint(); sp.x = e.clientX; sp.y = e.clientY;
       return sp.matrixTransform(fill.path.getScreenCTM().inverse());
     }
-    const hit = el('rect', { x: X1 - 30, y: 230, width: X2 - X1 + 60, height: 500, fill: 'transparent' }, area);
+    const hit = el('rect', { x: X1 - 30, y: 290, width: X2 - X1 + 60, height: 460, fill: 'transparent' }, area);
     hit.style.touchAction = 'none';
     if (o.inactive) { area.setAttribute('opacity', 0.45); pawG.setAttribute('opacity', 0); hit.style.pointerEvents = 'none'; }
     hit.addEventListener('pointerdown', (e) => {
