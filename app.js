@@ -872,20 +872,23 @@
   }
 
   // ---------------------------------------------------------------- Componente: repasar con el perrito
-  // La palabra aparece dos veces, más pequeña y más abajo: primero repasa la de la izquierda y luego la de la derecha
+  // La palabra aparece tres veces, pequeña y abajo: repasa de izquierda a derecha
   function traceBoard(word, o) {
     o = o || {};
     const bg = el('g', {}, L.scene);
     el('rect', { x: 110, y: 290, width: 1380, height: 460, rx: 40, fill: '#f4e3bf' }, bg);
     el('rect', { x: 110, y: 290, width: 1380, height: 460, rx: 40, fill: 'none', stroke: '#e5cf9f', 'stroke-width': 4 }, bg);
-    el('line', { x1: 800, y1: 330, x2: 800, y2: 715, stroke: '#e5cf9f', 'stroke-width': 4, 'stroke-dasharray': '10 14' }, bg);
+    const n = o.copies || 3, SW = 1380 / n;
+    for (let k = 1; k < n; k++) el('line', { x1: 110 + SW * k, y1: 330, x2: 110 + SW * k, y2: 715, stroke: '#e5cf9f', 'stroke-width': 4, 'stroke-dasharray': '10 14' }, bg);
     let active = 0;
-    const halves = [0, 1].map((i) => traceOne(word, Object.assign({}, o, {
-      cx: i ? 1145 : 455, x1: i ? 830 : 140, x2: i ? 1460 : 770, inactive: i === 1,
+    const halves = [];
+    for (let i = 0; i < n; i++) halves.push(traceOne(word, Object.assign({}, o, {
+      cx: 110 + SW * (i + 0.5), x1: 110 + SW * i + 30, x2: 110 + SW * (i + 1) - 30, inactive: i > 0,
       onDone: () => {
-        if (i === 0) {
-          active = 1; halves[1].activate();
-          if (o.onHalf) o.onHalf(0); else say('¡Muy bien! Ahora la otra.');
+        if (i < n - 1) {
+          active = i + 1; halves[i + 1].activate();
+          const lastNext = i + 1 === n - 1 && n > 2;
+          if (o.onHalf) o.onHalf(i, lastNext); else say(lastNext ? '¡Muy bien! Ahora la última.' : '¡Muy bien! Ahora la otra.');
         } else if (o.onDone) o.onDone();
       },
     })));
@@ -893,9 +896,9 @@
     return {
       demo(cb) { act().demo(cb); },
       reset() { act().reset(); },
-      progress() { return (halves[0].progress() + halves[1].progress()) / 2; },
+      progress() { return halves.reduce((a, h) => a + h.progress(), 0) / halves.length; },
       pulsePaw() { act().pulsePaw(); },
-      isDone() { return halves[1].isDone(); },
+      isDone() { return halves[halves.length - 1].isDone(); },
     };
   }
   function traceOne(word, o) {
@@ -905,7 +908,7 @@
     const bTmp = modFor(word).build(word);
     const cAsc = PR ? 0 : wordAsc(word, C);
     const baseline = PR ? 670 : cAsc > 150 ? 690 : 660;
-    const s = Math.min(1.1, 440 / bTmp.width, PR ? 9 : 195 / cAsc);
+    const s = Math.min(1.1, Math.min(440, X2 - X1 - 40) / bTmp.width, PR ? 9 : 195 / cAsc);
     el('line', { x1: X1, y1: baseline, x2: X2, y2: baseline, stroke: '#d8c49a', 'stroke-width': 3 }, area);
     if (PR) {
       const se = s * 0.88, by = baseline - 6 * se;
@@ -1861,7 +1864,7 @@
     function (arg) {
       const round = arg.round || 0;
       bgPlain('#f3efe6'); lataDots(4);
-      instruction('Repasa lata dos veces');
+      instruction('Repasa lata tres veces');
       // latas ganadas
       const shelf = el('g', {}, L.scene);
       for (let i = 0; i < 6; i++) canShape(shelf, 700 + i * 80, 860, 0.42, { color: '#d8cfbd' });
@@ -1875,19 +1878,19 @@
       const tb = traceBoard('lata', {
         onActivity: () => armIdle(10000, idleHint),
         onLift: () => say('Ahora la rayita de la t. Toca la mariposa.'),
-        onHalf: () => { dropCans(0); later(1600, () => say(LT.won1 + ' Ahora la otra.')); armIdle(14000, idleHint); },
+        onHalf: (i, last) => { dropCans(i); later(1600, () => say(last ? '¡Ganaste dos latas! Ahora la última.' : '¡Ganaste dos latas! Ahora la otra.')); armIdle(14000, idleHint); },
         onDone: () => {
           if (fin) return; fin = true; stopIdle();
-          dropCans(1);
+          dropCans(2);
             later(1600, () => say(LT.won2, { onend: () => later(700, () => go('lata', { step: 5 })) }));
           later(9000, () => { if (current === 'lata') go('lata', { step: 5 }); });
         },
       });
       function dropCans(round) {
-          SFX.fanfare(); fxConfetti(round ? 1145 : 455, 450, 40);
-          // caen tres latas doradas
-          for (let i = 0; i < 3; i++) {
-            const idx = round * 3 + i, tx = 700 + idx * 80;
+          SFX.fanfare(); fxConfetti(110 + 460 * (round + 0.5), 500, 40);
+          // caen dos latas doradas
+          for (let i = 0; i < 2; i++) {
+            const idx = round * 2 + i, tx = 700 + idx * 80;
             const g = el('g', {}, L.fx);
             const c = canShape(g, tx, 300, 0.42, { color: C_GOLD });
             setTimeout(() => tween(600, (t) => c.g.setAttribute('transform', `translate(${tx},${300 + 560 * t * t}) scale(.42)`), () => { SFX.clank(); }), 300 + i * 350);
@@ -2114,7 +2117,7 @@
     });
     const walk = (o) => { if (typeof o === 'string') out.add(o); else Object.values(o).forEach(walk); };
     walk(LT); Object.values(LT_NAME).forEach((t) => out.add(t));
-    ['la', 'ta', LT.findOk + ' ' + LT.findDone, LT.intro + ' ' + LT.open, 'Mmm, esa no. Busca la ele.', 'Mmm, esa no. Ahora busca la a.', 'Mmm, esa no. Ahora busca la te.', 'Mmm, esa no. Y otra vez la a.', spell('lata'), LT.won1 + ' Ahora la otra.', '¡Muy bien! Ahora la otra.'].forEach((t) => out.add(t));
+    ['la', 'ta', LT.findOk + ' ' + LT.findDone, LT.intro + ' ' + LT.open, 'Mmm, esa no. Busca la ele.', 'Mmm, esa no. Ahora busca la a.', 'Mmm, esa no. Ahora busca la te.', 'Mmm, esa no. Y otra vez la a.', spell('lata'), '¡Ganaste dos latas! Ahora la otra.', '¡Ganaste dos latas! Ahora la última.', '¡Muy bien! Ahora la otra.', '¡Muy bien! Ahora la última.'].forEach((t) => out.add(t));
     return Array.from(out).map((t) => ({ t, id: clipId(t) }));
   }
   window.__mila = { allPhrases, go, S: () => S, setState: (fn) => fn(S), setLesson, save, splitLang };
