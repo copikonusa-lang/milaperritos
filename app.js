@@ -872,28 +872,53 @@
   }
 
   // ---------------------------------------------------------------- Componente: repasar con el perrito
+  // La palabra aparece dos veces, más pequeña y más abajo: primero repasa la de la izquierda y luego la de la derecha
   function traceBoard(word, o) {
     o = o || {};
+    const bg = el('g', {}, L.scene);
+    el('rect', { x: 110, y: 230, width: 1380, height: 500, rx: 40, fill: '#f4e3bf' }, bg);
+    el('rect', { x: 110, y: 230, width: 1380, height: 500, rx: 40, fill: 'none', stroke: '#e5cf9f', 'stroke-width': 4 }, bg);
+    el('line', { x1: 800, y1: 270, x2: 800, y2: 690, stroke: '#e5cf9f', 'stroke-width': 4, 'stroke-dasharray': '10 14' }, bg);
+    let active = 0;
+    const halves = [0, 1].map((i) => traceOne(word, Object.assign({}, o, {
+      cx: i ? 1145 : 455, x1: i ? 830 : 140, x2: i ? 1460 : 770, inactive: i === 1,
+      onDone: () => {
+        if (i === 0) {
+          active = 1; halves[1].activate();
+          if (o.onHalf) o.onHalf(0); else say('¡Muy bien! Ahora la otra.');
+        } else if (o.onDone) o.onDone();
+      },
+    })));
+    const act = () => halves[active];
+    return {
+      demo(cb) { act().demo(cb); },
+      reset() { act().reset(); },
+      progress() { return (halves[0].progress() + halves[1].progress()) / 2; },
+      pulsePaw() { act().pulsePaw(); },
+      isDone() { return halves[1].isDone(); },
+    };
+  }
+  function traceOne(word, o) {
     const area = el('g', {}, L.scene);
-    el('rect', { x: 110, y: 150, width: 1380, height: 560, rx: 40, fill: '#f4e3bf' }, area);
-    el('rect', { x: 110, y: 150, width: 1380, height: 560, rx: 40, fill: 'none', stroke: '#e5cf9f', 'stroke-width': 4 }, area);
+    const X1 = o.x1, X2 = o.x2, CX = o.cx;
     const PR = isPrint(word);
     const bTmp = modFor(word).build(word);
     const cAsc = PR ? 0 : wordAsc(word, C);
-    const baseline = PR ? 540 : cAsc > 150 ? 610 : 520;
-    const s = Math.min(2.5, 1150 / bTmp.width, PR ? 9 : (baseline - 185) / cAsc);
-    el('line', { x1: 160, y1: baseline, x2: 1440, y2: baseline, stroke: '#d8c49a', 'stroke-width': 3 }, area);
+    const baseline = PR ? 600 : cAsc > 150 ? 630 : 590;
+    const s = Math.min(1.45, 580 / bTmp.width, PR ? 9 : 260 / cAsc);
+    el('line', { x1: X1, y1: baseline, x2: X2, y2: baseline, stroke: '#d8c49a', 'stroke-width': 3 }, area);
     if (PR) {
       const se = s * 0.88, by = baseline - 6 * se;
-      el('line', { x1: 160, y1: by - 60 * se, x2: 1440, y2: by - 60 * se, stroke: '#e3d2ad', 'stroke-width': 3, 'stroke-dasharray': '14 12' }, area);
-      el('line', { x1: 160, y1: by - 120 * se, x2: 1440, y2: by - 120 * se, stroke: '#e3d2ad', 'stroke-width': 3 }, area);
+      el('line', { x1: X1, y1: by - 60 * se, x2: X2, y2: by - 60 * se, stroke: '#e3d2ad', 'stroke-width': 3, 'stroke-dasharray': '14 12' }, area);
+      el('line', { x1: X1, y1: by - 120 * se, x2: X2, y2: by - 120 * se, stroke: '#e3d2ad', 'stroke-width': 3 }, area);
     } else
-    el('line', { x1: 160, y1: baseline - 100 * s, x2: 1440, y2: baseline - 100 * s, stroke: '#e3d2ad', 'stroke-width': 3, 'stroke-dasharray': '14 12' }, area);
-    // carretera
-    const road = cursiveWord(area, word, { cx: 800, baseline, scale: s, sw: 38, color: '#fff4da', lifts: false });
-    const guide = cursiveWord(area, word, { cx: 800, baseline, scale: s, sw: 3.2, color: '#b49a68', lifts: false });
+    el('line', { x1: X1, y1: baseline - 100 * s, x2: X2, y2: baseline - 100 * s, stroke: '#e3d2ad', 'stroke-width': 3, 'stroke-dasharray': '14 12' }, area);
+    // carretera (un poco más ancha porque la letra es más pequeña)
+    const RW = Math.max(38, 64 / s), FW = Math.max(24, 40 / s);
+    const road = cursiveWord(area, word, { cx: CX, baseline, scale: s, sw: RW, color: '#fff4da', lifts: false });
+    const guide = cursiveWord(area, word, { cx: CX, baseline, scale: s, sw: 3.2 / Math.min(1, s), color: '#b49a68', lifts: false });
     guide.path.setAttribute('stroke-dasharray', '6 7');
-    const fill = cursiveWord(area, word, { cx: 800, baseline, scale: s, sw: 24, color: '#9fd3a3', lifts: false });
+    const fill = cursiveWord(area, word, { cx: CX, baseline, scale: s, sw: FW, color: '#9fd3a3', lifts: false });
     const LEN = fill.path.getTotalLength();
     fill.path.style.strokeDasharray = LEN;
     fill.path.style.strokeDashoffset = LEN;
@@ -924,19 +949,20 @@
     }
     function setFill(i) { fill.path.style.strokeDashoffset = LEN * (1 - i / N); }
     placePaw();
-    const TOL = 30;
+    const TOL = Math.max(30, 62 / s);
     let activeId = null;
     function local(e) {
       const sp = stage.createSVGPoint(); sp.x = e.clientX; sp.y = e.clientY;
       return sp.matrixTransform(fill.path.getScreenCTM().inverse());
     }
-    const hit = el('rect', { x: 110, y: 150, width: 1380, height: 560, rx: 40, fill: 'transparent' }, area);
+    const hit = el('rect', { x: X1 - 30, y: 230, width: X2 - X1 + 60, height: 500, fill: 'transparent' }, area);
     hit.style.touchAction = 'none';
+    if (o.inactive) { area.setAttribute('opacity', 0.45); pawG.setAttribute('opacity', 0); hit.style.pointerEvents = 'none'; }
     hit.addEventListener('pointerdown', (e) => {
       if (isPalm(e) || activeId !== null || done || demoRunning) return;
       activeId = e.pointerId; try { hit.setPointerCapture(e.pointerId); } catch (x) {}
       const p = local(e);
-      inkPath = el('path', { d: '', fill: 'none', stroke: '#6a4a2a', 'stroke-width': 7, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, inkG);
+      inkPath = el('path', { d: '', fill: 'none', stroke: '#6a4a2a', 'stroke-width': Math.max(7, 14 / s), 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, inkG);
       inkD = `M ${p.x.toFixed(1)} ${p.y.toFixed(1)}`; inkPath.setAttribute('d', inkD);
       if (o.onActivity) o.onActivity();
       advance(p);
@@ -1002,6 +1028,7 @@
         });
       },
       reset() { if (done || demoRunning) return; clear(inkG); cur = 0; setFill(0); placePaw(); },
+      activate() { area.setAttribute('opacity', 1); pawG.setAttribute('opacity', 1); hit.style.pointerEvents = ''; restartClass(pawInner, 'a-wait'); },
       progress() { return cur / N; },
       pulsePaw() { restartClass(pawInner, 'a-wait'); },
       isDone() { return done; },
@@ -1834,11 +1861,12 @@
     function (arg) {
       const round = arg.round || 0;
       bgPlain('#f3efe6'); lataDots(4);
+      instruction('Repasa lata dos veces');
       // latas ganadas
       const shelf = el('g', {}, L.scene);
-      for (let i = 0; i < 6; i++) canShape(shelf, 700 + i * 80, 860, 0.42, { color: i < round * 3 ? C_GOLD : '#d8cfbd' });
+      for (let i = 0; i < 6; i++) canShape(shelf, 700 + i * 80, 860, 0.42, { color: '#d8cfbd' });
       let hint = 0, fin = false;
-      const prompt = round ? LT.write2 : LT.write1;
+      const prompt = LT.write1;
       const idleHint = () => {
         hint++;
         if (hint === 1) { say(LT.hint1); tb.pulsePaw(); armIdle(10000, idleHint); }
@@ -1847,9 +1875,16 @@
       const tb = traceBoard('lata', {
         onActivity: () => armIdle(10000, idleHint),
         onLift: () => say('Ahora la rayita de la t. Toca la mariposa.'),
+        onHalf: () => { dropCans(0); later(1600, () => say(LT.won1 + ' Ahora la otra.')); armIdle(14000, idleHint); },
         onDone: () => {
           if (fin) return; fin = true; stopIdle();
-          SFX.fanfare(); fxConfetti(800, 400, 40);
+          dropCans(1);
+            later(1600, () => say(LT.won2, { onend: () => later(700, () => go('lata', { step: 5 })) }));
+          later(9000, () => { if (current === 'lata') go('lata', { step: 5 }); });
+        },
+      });
+      function dropCans(round) {
+          SFX.fanfare(); fxConfetti(round ? 1145 : 455, 450, 40);
           // caen tres latas doradas
           for (let i = 0; i < 3; i++) {
             const idx = round * 3 + i, tx = 700 + idx * 80;
@@ -1857,11 +1892,7 @@
             const c = canShape(g, tx, 300, 0.42, { color: C_GOLD });
             setTimeout(() => tween(600, (t) => c.g.setAttribute('transform', `translate(${tx},${300 + 560 * t * t}) scale(.42)`), () => { SFX.clank(); }), 300 + i * 350);
           }
-          const last = round >= 1;
-          later(1600, () => say(last ? LT.won2 : LT.won1, { onend: () => later(700, () => go('lata', last ? { step: 5 } : { step: 4, round: 1 })) }));
-          later(9000, () => { if (current === 'lata') go('lata', last ? { step: 5 } : { step: 4, round: 1 }); });
-        },
-      });
+      }
       const g = el('g', {}, L.scene);
       button(g, { x: 120, y: 820, w: 150, h: 110, fill: C_BLUE, icon: 'speaker', onTap: () => say(prompt) });
       button(g, { x: 290, y: 820, w: 150, h: 110, fill: '#fff', stroke: '#e3d6bf', icon: 'help', iconColor: C_ORANGE, onTap: () => { hint = 1; idleHint(); } });
@@ -2083,7 +2114,7 @@
     });
     const walk = (o) => { if (typeof o === 'string') out.add(o); else Object.values(o).forEach(walk); };
     walk(LT); Object.values(LT_NAME).forEach((t) => out.add(t));
-    ['la', 'ta', LT.findOk + ' ' + LT.findDone, LT.intro + ' ' + LT.open, 'Mmm, esa no. Busca la ele.', 'Mmm, esa no. Ahora busca la a.', 'Mmm, esa no. Ahora busca la te.', 'Mmm, esa no. Y otra vez la a.', spell('lata')].forEach((t) => out.add(t));
+    ['la', 'ta', LT.findOk + ' ' + LT.findDone, LT.intro + ' ' + LT.open, 'Mmm, esa no. Busca la ele.', 'Mmm, esa no. Ahora busca la a.', 'Mmm, esa no. Ahora busca la te.', 'Mmm, esa no. Y otra vez la a.', spell('lata'), LT.won1 + ' Ahora la otra.', '¡Muy bien! Ahora la otra.'].forEach((t) => out.add(t));
     return Array.from(out).map((t) => ({ t, id: clipId(t) }));
   }
   window.__mila = { allPhrases, go, S: () => S, setState: (fn) => fn(S), setLesson, save, splitLang };
