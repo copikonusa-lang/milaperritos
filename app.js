@@ -817,6 +817,15 @@
       if (fin) star(bi, 82, 0, 18, C_GOLD);
       onTap(b, () => { if (!on) { setLesson(l.id); go('map'); } });
     });
+    {
+      const sp = el('g', { transform: 'translate(900,200)' }, L.scene);
+      const si = el('g', { cls: S.specials && S.specials.lata ? '' : 'pulse' }, sp);
+      el('rect', { x: -130, y: -44, width: 260, height: 88, rx: 44, fill: '#fff4c9', stroke: C_GOLD, 'stroke-width': 6 }, si);
+      canShape(si, -88, 34, 0.36, { color: C_GOLD });
+      el('text', { x: 22, y: -6, 'text-anchor': 'middle', 'font-size': 24, 'font-weight': 900, fill: '#7a5a20', text: 'Especial' }, si);
+      el('text', { x: 22, y: 24, 'text-anchor': 'middle', 'font-size': 26, 'font-weight': 900, fill: C_INK, text: '¡lata!' }, si);
+      onTap(sp, () => go('lata', { step: 0 }));
+    }
     NODES.forEach((n, i) => {
       if (n.key === 'party' && !allDone) {
         const g = el('g', { transform: `translate(${n.x},${n.y})`, opacity: 0.5 }, L.scene);
@@ -851,7 +860,7 @@
     button(L.scene, { x: 120, y: 820, w: 110, h: 110, fill: 'rgba(255,255,255,.9)', icon: 'house', iconColor: C_ORANGE, onTap: () => go('casita') });
     const nW = ['', 'una', 'dos', 'tres', 'cuatro', 'cinco'][WORDS.length];
     instruction(nxt === 'party' ? '¡Lo lograste! Toca la estrella para la fiesta' : 'Toca la huellita que brilla');
-    later(500, () => say(nxt === 'party' ? `¡Terminaste las ${nW} palabras! Toca la estrella para la fiesta.` : (nxt === WORDS[0] && S.progress[nxt].find == null) ? lessonIntro(LES) : nxt === 'warmup' ? 'Primero vamos a calentar con la letra m. Toca la huellita que brilla.' : 'Toca la huellita que brilla para la siguiente palabra.'));
+    if (!(S.specials && S.specials.lata)) later(500, () => say(LT.special)); else later(500, () => say(nxt === 'party' ? `¡Terminaste las ${nW} palabras! Toca la estrella para la fiesta.` : (nxt === WORDS[0] && S.progress[nxt].find == null) ? lessonIntro(LES) : nxt === 'warmup' ? 'Primero vamos a calentar con la letra m. Toca la huellita que brilla.' : 'Toca la huellita que brilla para la siguiente palabra.'));
   };
   function star(g, x, y, r, color) {
     let d = '';
@@ -1538,6 +1547,402 @@
   };
 
   // ---------------------------------------------------------------- Mi casita (álbum de trucos)
+  // ================================================================== JUEGO ESPECIAL: LA FIESTA DE LA LATA
+  const LT = {
+    intro: '¡Hoy es un día especial, Milana! Vamos a jugar con la palabra lata.',
+    open: 'Esta es una lata. Toca la tapita para abrirla.',
+    opened: '¡Pssst! En las latas vienen los refrescos y los jugos. ¡Qué rico!',
+    next: 'Toca la flecha para seguir.',
+    find: '¿Cuál es la lata? Tócala.',
+    findOk: '¡Sí! ¡Esa es la lata!',
+    findAgain: '¡Otra vez! ¿Dónde está la lata?',
+    findDone: '¡Muy bien! Ya sabes qué es una lata.',
+    no: { botella: 'Esa es una botella. Busca la lata.', vaso: 'Ese es un vaso. Busca la lata.', caja: 'Esa es una cajita de jugo. Busca la lata.' },
+    drums: 'La palabra lata tiene dos pedacitos: la... ta. Toca los tambores de lata: primero la, después ta.',
+    drumOrder: 'Primero la, después ta.',
+    drumOk: '¡La... ta! ¡Lata!',
+    drumAgain: '¡Otra vez! la... ta.',
+    letters: 'Ahora vamos a armar lata con letras. Toca la lata que tiene la ele.',
+    want: { l: 'Toca la lata que tiene la ele.', a: 'Ahora busca la a.', t: 'Ahora busca la te.', a2: 'Y otra vez la a.' },
+    wrong: 'Mmm, esa no. Mira la que brilla.',
+    built: '¡Armaste lata!',
+    write1: 'Escribe lata en cursiva. Cada vez que la escribas, ganas latas para la torre.',
+    write2: 'Una vez más para ganar más latas.',
+    hint1: 'Pon tu dedo en el punto verde y sigue la huellita.',
+    won1: '¡Escribiste lata! Ganaste tres latas.',
+    won2: '¡Ya tienes seis latas! Vamos a armar la torre.',
+    tower: '¡Hora del premio! Toca una lata para lanzar la pelota y tumbar la torre.',
+    pum: '¡Pum! Quedan latas. ¡Lanza otra vez!',
+    allDown: '¡Tumbaste todas las latas!',
+    finale: '¡Eres una campeona, Milana! Mañana en el cole ya sabes: lata se escribe ele, a, te, a.',
+    special: '¡Hoy hay un juego especial! Toca la lata dorada.',
+  };
+  const LT_NAME = { l: 'ele', a: 'a', t: 'te', m: 'eme', s: 'ese', o: 'o' };
+  function lataPup() { return S.friends.includes('bingo') ? 'bingo' : S.friends.includes('coco') ? 'coco' : 'canela'; }
+  SFX.fizz = function () {
+    if (!S.sound) return; const c = ac(); if (!c) return;
+    const t = c.currentTime, len = Math.floor(c.sampleRate * 0.9);
+    const buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0);
+    for (let j = 0; j < len; j++) d[j] = (Math.random() * 2 - 1) * Math.pow(1 - j / len, 1.6) * (j < 600 ? j / 600 : 1);
+    const src = c.createBufferSource(); src.buffer = buf;
+    const f = c.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 3200;
+    const g = c.createGain(); g.gain.value = 0.32;
+    src.connect(f); f.connect(g); g.connect(c.destination); src.start(t);
+    SFX.tone(1400, 0.05, 'square', 0.05);
+  };
+  SFX.clank = function (delay) {
+    [1250, 2730, 3900].forEach((fq, i) => SFX.tone(fq * (0.9 + Math.random() * 0.2), 0.32 - i * 0.07, 'sine', 0.09 - i * 0.02, delay || 0));
+    SFX.tone(420, 0.12, 'triangle', 0.08, delay || 0);
+  };
+  SFX.drum = function (hi) {
+    if (!S.sound) return; const c = ac(); if (!c) return;
+    const t = c.currentTime, o = c.createOscillator(), g = c.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(hi ? 300 : 210, t); o.frequency.exponentialRampToValueAtTime(hi ? 140 : 90, t + 0.25);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.4, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+    o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + 0.4);
+    SFX.clank(0.0);
+  };
+  // lata dibujada (y = base de la lata)
+  function canShape(parent, x, y, sc, o) {
+    o = o || {};
+    const g = el('g', { transform: `translate(${x},${y}) scale(${sc})` }, parent);
+    const inner = el('g', {}, g);
+    const col = o.color || '#e63946';
+    el('ellipse', { cx: 0, cy: -10, rx: 60, ry: 12, fill: '#9aa6b1' }, inner);
+    el('rect', { x: -60, y: -180, width: 120, height: 170, rx: 12, fill: col }, inner);
+    el('rect', { x: -46, y: -168, width: 13, height: 146, rx: 6, fill: 'rgba(255,255,255,.28)' }, inner);
+    el('ellipse', { cx: 0, cy: -180, rx: 60, ry: 14, fill: '#d5dce2', stroke: '#aab4bd', 'stroke-width': 4 }, inner);
+    el('ellipse', { cx: 10, cy: -182, rx: 16, ry: 5, fill: '#aab4bd' }, inner);
+    const lab = el('g', { transform: 'translate(0,-95)' }, inner);
+    if (o.letter || o.label) {
+      el('circle', { r: 50, fill: '#fff' }, lab);
+      if (o.letter) cursiveWord(lab, o.letter, { cx: 0, baseline: /[lt]/.test(o.letter) ? 30 : 20, scale: 0.62, sw: 10, tail: false, maxAsc: 78 });
+      if (o.label) cursiveWord(lab, o.label, { cx: 0, baseline: /[lt]/.test(o.label) ? 30 : 20, scale: 0.5, sw: 9, maxAsc: 74 });
+    } else {
+      el('path', { d: 'M -60 -10 C -30 -40 30 20 60 -10 L 60 26 C 30 56 -30 -4 -60 26 Z', fill: '#fff' }, lab);
+      el('circle', { cx: 0, cy: 10, r: 16, fill: '#ff9f1c' }, lab);
+    }
+    return { g, inner, x, y, sc };
+  }
+  function objPic(parent, kind, x, y, sc, col) {
+    if (kind === 'lata') return canShape(parent, x, y, sc).g;
+    const g = el('g', { transform: `translate(${x},${y}) scale(${sc})` }, parent);
+    if (kind === 'botella') {
+      el('path', { d: 'M -18 -250 h36 v50 c0 30 42 40 42 90 v96 q0 14 -14 14 h-92 q-14 0 -14 -14 v-96 c0 -50 42 -60 42 -90 z', fill: '#5fbf7a', stroke: '#3c8f55', 'stroke-width': 5 }, g);
+      el('rect', { x: -22, y: -268, width: 44, height: 22, rx: 6, fill: '#e25555' }, g);
+      el('rect', { x: -42, y: -100, width: 84, height: 54, rx: 8, fill: '#fff6d0' }, g);
+      el('rect', { x: -30, y: -160, width: 10, height: 130, rx: 5, fill: 'rgba(255,255,255,.35)' }, g);
+    } else if (kind === 'vaso') {
+      el('path', { d: 'M -64 -200 L 64 -200 L 50 0 L -50 0 Z', fill: 'rgba(205,232,250,.8)', stroke: '#8fb8d6', 'stroke-width': 6, 'stroke-linejoin': 'round' }, g);
+      el('path', { d: 'M -58 -130 L 58 -130 L 50 -4 L -50 -4 Z', fill: col || '#8fd0f5' }, g);
+      el('ellipse', { cx: 0, cy: -130, rx: 58, ry: 8, fill: col ? '#c9733a' : '#b5e2fb' }, g);
+      if (col) for (let i = 0; i < 6; i++) el('circle', { cx: -30 + (i * 23) % 60, cy: -20 - i * 18, r: 5, fill: 'rgba(255,255,255,.6)' }, g);
+    } else if (kind === 'caja') {
+      el('path', { d: 'M 20 -250 L 34 -250 L 34 -190', fill: 'none', stroke: '#ff6fa5', 'stroke-width': 9, 'stroke-linecap': 'round' }, g);
+      el('rect', { x: -60, y: -200, width: 120, height: 200, rx: 8, fill: '#ffb03b', stroke: '#e08a12', 'stroke-width': 5 }, g);
+      el('path', { d: 'M -60 -200 L -40 -224 L 60 -224 L 60 -200 Z', fill: '#ffc871', stroke: '#e08a12', 'stroke-width': 5, 'stroke-linejoin': 'round' }, g);
+      el('circle', { cx: 0, cy: -100, r: 34, fill: '#fff' }, g);
+      el('circle', { cx: 0, cy: -100, r: 22, fill: '#ff8a1c' }, g);
+    }
+    return g;
+  }
+  function lataDots(step) {
+    const g = el('g', { transform: 'translate(1270,76)' }, L.scene);
+    for (let i = 0; i < 6; i++) {
+      const c = el('g', { transform: `translate(${i * 46},26) scale(.26)` }, g);
+      const k = canShape(c, 0, 0, 1, { color: i < step ? C_GOLD : i === step ? C_ORANGE : '#cfc4ad' });
+      if (i > step) k.g.setAttribute('opacity', 0.55);
+    }
+  }
+  function nextArrow(fn) {
+    const b = button(L.scene, { x: 1400, y: 800, w: 200, h: 120, fill: C_GREEN, icon: 'play', onTap: fn });
+    b.querySelector('.press').classList.add('pulse');
+    return b;
+  }
+  function lataBar(repeatText) {
+    const g = el('g', {}, L.scene);
+    button(g, { x: 120, y: 820, w: 150, h: 110, fill: C_BLUE, icon: 'speaker', onTap: () => say(repeatText()) });
+    button(g, { x: 290, y: 820, w: 110, h: 110, fill: 'rgba(255,255,255,.85)', icon: 'house', iconColor: '#7a6a55', onTap: () => go('map') });
+  }
+  function lataTitle() {}
+  SCREENS.lata = function (arg) {
+    arg = arg || {};
+    const step = arg.step || 0;
+    S.specials = S.specials || {};
+    LATA_STEPS[step](arg);
+  };
+  const LATA_STEPS = [
+    // 0 · ¿Qué es una lata?
+    function () {
+      bgPark({ noSun: true }); lataTitle(); lataDots(0);
+      const pup = puppy(L.scene, 330, 790, 0.62, lataPup());
+      const can = canShape(L.scene, 800, 720, 2.3);
+      const tapG = el('g', { transform: 'translate(800,300)' }, L.scene);
+      const ring = el('circle', { r: 80, fill: 'rgba(255,255,255,.01)', stroke: C_ORANGE, 'stroke-width': 8, 'stroke-dasharray': '16 12', cls: 'pulse' }, tapG);
+      let opened = false, text = LT.intro + ' ' + LT.open;
+      const hitAll = el('rect', { x: 640, y: 260, width: 320, height: 470, fill: 'transparent' }, L.scene);
+      const doOpen = () => {
+        if (opened) return; opened = true; tapG.remove(); hitAll.remove();
+        SFX.fizz(); pup.happy();
+        // burbujas
+        for (let i = 0; i < 26; i++) {
+          const bx = 780 + Math.random() * 60, b = el('circle', { cx: bx, cy: 300, r: 6 + Math.random() * 12, fill: i % 3 ? '#fff' : '#ffd6a0', opacity: 0.9 }, L.fx);
+          const dx = (Math.random() - 0.5) * 360, up = 160 + Math.random() * 200, dl = Math.random() * 500;
+          setTimeout(() => tween(1100, (k) => { b.setAttribute('cx', bx + dx * k); b.setAttribute('cy', 300 - up * k); b.setAttribute('opacity', 0.9 * (1 - k)); }, () => b.remove()), dl);
+        }
+        later(900, () => {
+          const l = el('g', { cls: 'pop-in' }, L.scene); l.style.transformOrigin = '360px 420px';
+          objPic(l, 'vaso', 360, 520, 0.9, '#8a4a1c');
+          el('text', { x: 360, y: 590, 'text-anchor': 'middle', 'font-size': 40, 'font-weight': 900, fill: C_INK, text: 'refresco' }, l);
+          const r = el('g', { cls: 'pop-in' }, L.scene); r.style.transformOrigin = '1240px 420px';
+          objPic(r, 'caja', 1240, 520, 0.9);
+          el('text', { x: 1240, y: 590, 'text-anchor': 'middle', 'font-size': 40, 'font-weight': 900, fill: C_INK, text: 'jugo' }, r);
+          pup.setPos(540, 870, 0.5);
+        });
+        text = LT.opened;
+        say(LT.opened, { onend: () => later(400, () => { nextArrow(() => go('lata', { step: 1 })); say(LT.next); }) });
+        later(9000, () => { if (!L.scene.querySelector('.pulse')) nextArrow(() => go('lata', { step: 1 })); });
+      };
+      onTap(tapG, doOpen); onTap(hitAll, doOpen);
+      instruction('Toca la tapita para abrir la lata');
+      lataBar(() => text);
+      later(400, () => say(LT.intro + ' ' + LT.open));
+    },
+    // 1 · ¿Cuál es la lata?
+    function (arg) {
+      const round = arg.round || 0;
+      bgPark({ noSun: true }); lataTitle(); lataDots(1);
+      const pup = puppy(L.scene, 1440, 880, 0.45, lataPup());
+      const kinds = ['lata', 'botella', 'vaso', 'caja'];
+      const orders = [['botella', 'lata', 'caja', 'vaso'], ['vaso', 'caja', 'botella', 'lata'], ['lata', 'vaso', 'caja', 'botella']];
+      const ord = orders[round % 3];
+      let done = false, miss = 0;
+      const cards = ord.map((k, i) => {
+        const x = 260 + i * 360, y = 690;
+        const g = el('g', { transform: `translate(${x},0)` }, L.scene);
+        const inner = el('g', {}, g);
+        const bg = el('rect', { x: -150, y: 250, width: 300, height: 480, rx: 34, fill: 'rgba(255,255,255,.85)', stroke: '#e1d6c0', 'stroke-width': 4 }, inner);
+        objPic(inner, k, 0, y, 1.15);
+        onTap(g, () => {
+          if (done) return;
+          if (k === 'lata') {
+            done = true; bg.setAttribute('stroke', C_GOLD); bg.setAttribute('stroke-width', 10);
+            restartClass(inner, 'bounce1'); fxStars(x, 480); pup.happy(); SFX.puppies(3, 0.2);
+            const last = round >= 2;
+            say(last ? LT.findOk + ' ' + LT.findDone : LT.findOk, { onend: () => later(500, () => last ? go('lata', { step: 2 }) : go('lata', { step: 1, round: round + 1 })) });
+            later(last ? 9000 : 5000, () => { if (current === 'lata') go('lata', last ? { step: 2 } : { step: 1, round: round + 1 }); });
+          } else {
+            miss++; restartClass(inner, 'shake'); pup.confused(); say(LT.no[k]);
+            if (miss >= 2) cards.forEach((c) => { if (c.k === 'lata') c.bg.setAttribute('class', 'glow'); });
+          }
+        });
+        return { k, bg };
+      });
+      instruction('¿Cuál es la lata?');
+      lataBar(() => LT.find);
+      later(400, () => say(round ? LT.findAgain : LT.find));
+    },
+    // 2 · Tambores: la · ta
+    function (arg) {
+      const round = arg.round || 0;
+      bgPark({ noSun: true }); lataTitle(); lataDots(2);
+      const pup = puppy(L.scene, 410, 870, 0.5, lataPup());
+      const word = el('g', {}, L.scene);
+      let seq = [], done = false;
+      const drums = ['la', 'ta'].map((sy, i) => {
+        const x = 620 + i * 420;
+        const c = canShape(L.scene, x, 700, 2.1, { label: sy, color: i ? C_BLUE : C_PURPLE });
+        el('rect', { x: -66, y: -200, width: 132, height: 210, fill: 'transparent' }, c.g);
+        onTap(c.g, () => {
+          if (done) return;
+          SFX.drum(i === 1); restartClass(c.inner, 'a-hop'); pup.hop();
+          say(sy);
+          seq.push(sy);
+          if (seq.length === 1 && sy !== 'la') { seq = []; later(500, () => say(LT.drumOrder)); return; }
+          if (seq.length === 2) {
+            if (seq[1] === 'ta') {
+              done = true;
+              later(600, () => {
+                const w = cursiveWord(word, 'lata', { cx: 830, baseline: 250, scale: 0.9, sw: 11, maxAsc: 110 });
+                word.style.transformOrigin = '830px 200px'; word.setAttribute('class', 'pop-in');
+                fxConfetti(830, 220, 30); pup.happy();
+                const last = round >= 1;
+                say(LT.drumOk, {
+                  onend: () => later(700, () => go('lata', last ? { step: 3 } : { step: 2, round: 1 })),
+                });
+                later(7000, () => { if (current === 'lata') go('lata', last ? { step: 3 } : { step: 2, round: 1 }); });
+              });
+            } else { seq = []; later(500, () => say(LT.drumOrder)); }
+          }
+        });
+        return c;
+      });
+      instruction('Toca: primero  la  ·  después  ta');
+      lataBar(() => LT.drums);
+      later(400, () => say(round ? LT.drumAgain : LT.drums));
+    },
+    // 3 · Arma lata con letras
+    function () {
+      bgPark({ noSun: true }); lataTitle(); lataDots(3);
+      const pup = puppy(L.scene, 1460, 880, 0.42, lataPup());
+      const target = ['l', 'a', 't', 'a'];
+      const slots = target.map((ch, i) => {
+        const x = 800 - 1.5 * 170 + i * 170;
+        const r = el('rect', { x: x - 75, y: 170, width: 150, height: 150, rx: 26, fill: 'rgba(255,255,255,.7)', stroke: '#d9cdb2', 'stroke-width': 4, 'stroke-dasharray': '12 10' }, L.scene);
+        return { x, r };
+      });
+      const letters = ['a', 'm', 't', 'l', 's', 'a'];
+      let k = 0, miss = 0, done = false;
+      const want = () => (k === 3 ? LT.want.a2 : LT.want[target[k]]);
+      const cans = letters.map((ch, i) => {
+        const x = 230 + i * 228;
+        const c = canShape(L.scene, x, 720, 1.25, { letter: ch, color: ['#e63946', '#3d8bd8', '#9c6ade', '#3f9f6b', '#f28c38', '#e86a7a'][i] });
+        el('rect', { x: -66, y: -200, width: 132, height: 210, fill: 'transparent' }, c.g);
+        const o = { ch, c, x, used: false };
+        onTap(c.g, () => {
+          if (done || o.used) return;
+          if (ch === target[k]) {
+            o.used = true; cans.forEach((q) => q.c.inner.setAttribute('class', ''));
+            SFX.clank(); say(LT_NAME[ch]);
+            const sl = slots[k]; k++; miss = 0;
+            const sx = x, sy = 720, ex = sl.x, ey = 312;
+            tween(500, (t) => { const e = 1 - Math.pow(1 - t, 3); c.g.setAttribute('transform', `translate(${sx + (ex - sx) * e},${sy + (ey - sy) * e - Math.sin(t * Math.PI) * 120}) scale(${1.25 - 0.55 * e})`); });
+            sl.r.setAttribute('stroke', C_GOLD); sl.r.setAttribute('stroke-dasharray', '');
+            if (k === 4) {
+              done = true;
+              later(900, () => {
+                pup.happy(); fxConfetti(800, 260, 36); SFX.puppies(5, 0.2);
+                const w = cursiveWord(L.scene, 'lata', { cx: 800, baseline: 520, scale: 1.1, sw: 12, maxAsc: 150 });
+                say(spell('lata'), { onend: () => say(LT.built, { onend: () => later(600, () => go('lata', { step: 4 })) }) });
+                later(10000, () => { if (current === 'lata') go('lata', { step: 4 }); });
+              });
+              cans.forEach((q) => { if (!q.used) tween(400, (t) => q.c.g.setAttribute('opacity', 1 - t)); });
+            } else later(700, () => say(want()));
+          } else {
+            miss++; restartClass(c.inner, 'shake'); pup.confused();
+            say(miss >= 2 ? LT.wrong : 'Mmm, esa no. ' + want().replace('Toca la lata que tiene la ele.', 'Busca la ele.'));
+            if (miss >= 2) cans.forEach((q) => { if (!q.used && q.ch === target[k]) { q.c.inner.setAttribute('class', 'glow'); } });
+          }
+        });
+        return o;
+      });
+      instruction('Arma lata: l · a · t · a');
+      lataBar(want);
+      later(400, () => say(LT.letters));
+    },
+    // 4 · Escribe lata (gana latas para la torre)
+    function (arg) {
+      const round = arg.round || 0;
+      bgPlain('#f3efe6'); lataDots(4);
+      // latas ganadas
+      const shelf = el('g', {}, L.scene);
+      for (let i = 0; i < 6; i++) canShape(shelf, 700 + i * 80, 860, 0.42, { color: i < round * 3 ? C_GOLD : '#d8cfbd' });
+      let hint = 0, fin = false;
+      const prompt = round ? LT.write2 : LT.write1;
+      const idleHint = () => {
+        hint++;
+        if (hint === 1) { say(LT.hint1); tb.pulsePaw(); armIdle(10000, idleHint); }
+        else { say('Mira cómo se hace.'); tb.demo(() => armIdle(14000, idleHint)); }
+      };
+      const tb = traceBoard('lata', {
+        onActivity: () => armIdle(10000, idleHint),
+        onLift: () => say('Ahora la rayita de la t. Toca la mariposa.'),
+        onDone: () => {
+          if (fin) return; fin = true; stopIdle();
+          SFX.fanfare(); fxConfetti(800, 400, 40);
+          // caen tres latas doradas
+          for (let i = 0; i < 3; i++) {
+            const idx = round * 3 + i, tx = 700 + idx * 80;
+            const g = el('g', {}, L.fx);
+            const c = canShape(g, tx, 300, 0.42, { color: C_GOLD });
+            setTimeout(() => tween(600, (t) => c.g.setAttribute('transform', `translate(${tx},${300 + 560 * t * t}) scale(.42)`), () => { SFX.clank(); }), 300 + i * 350);
+          }
+          const last = round >= 1;
+          later(1600, () => say(last ? LT.won2 : LT.won1, { onend: () => later(700, () => go('lata', last ? { step: 5 } : { step: 4, round: 1 })) }));
+          later(9000, () => { if (current === 'lata') go('lata', last ? { step: 5 } : { step: 4, round: 1 }); });
+        },
+      });
+      const g = el('g', {}, L.scene);
+      button(g, { x: 120, y: 820, w: 150, h: 110, fill: C_BLUE, icon: 'speaker', onTap: () => say(prompt) });
+      button(g, { x: 290, y: 820, w: 150, h: 110, fill: '#fff', stroke: '#e3d6bf', icon: 'help', iconColor: C_ORANGE, onTap: () => { hint = 1; idleHint(); } });
+      button(g, { x: 440, y: 820, w: 110, h: 110, fill: 'rgba(255,255,255,.85)', icon: 'house', iconColor: '#7a6a55', onTap: () => go('map') });
+      armIdle(12000, idleHint);
+      later(400, () => say(prompt));
+    },
+    // 5 · Premio: tumba latas
+    function () {
+      bgPark({ ground: 700, noSun: true }); lataTitle(); lataDots(5);
+      el('rect', { x: 820, y: 700, width: 560, height: 30, rx: 10, fill: '#b7895a' }, L.scene);
+      el('rect', { x: 850, y: 730, width: 22, height: 120, fill: '#9a6f45' }, L.scene);
+      el('rect', { x: 1328, y: 730, width: 22, height: 120, fill: '#9a6f45' }, L.scene);
+      const coat = lataPup();
+      const pup = puppy(L.scene, 330, 820, 0.7, coat);
+      const cols = ['#e63946', '#3d8bd8', '#9c6ade', '#3f9f6b', '#f28c38', '#e86a7a'];
+      const W = 124, H = 168, sc = 0.85, cx0 = 1100;
+      const cans = [];
+      [[0, 3], [1, 2], [2, 1]].forEach(([r, n]) => {
+        for (let i = 0; i < n; i++) {
+          const x = cx0 - ((n - 1) * W) / 2 + i * W, y = 700 - r * H;
+          const c = canShape(L.scene, x, y, sc, { color: cols[cans.length] });
+          cans.push({ r, i, x, y, c, down: false });
+        }
+      });
+      const at = (r, i) => cans.find((q) => q.r === r && q.i === i);
+      let throwing = false, throws = 0, over = false;
+      function knock(q, dir, delay) {
+        if (q.down) return; q.down = true;
+        setTimeout(() => {
+          SFX.clank();
+          const tx = Math.min(1320, Math.max(900, q.x + dir * (40 + Math.random() * 200))), rot = dir * (80 + Math.random() * 30) * (Math.random() < 0.5 ? 1 : -1), y0 = q.y, yE = 862 + Math.random() * 20;
+          tween(900, (t) => q.c.g.setAttribute('transform', `translate(${q.x + (tx - q.x) * t},${y0 + (yE - y0) * t * t - Math.sin(t * Math.PI) * 80}) rotate(${rot * t}) scale(${sc})`));
+        }, delay);
+        // las de arriba se caen
+        [at(q.r + 1, q.i - 1), at(q.r + 1, q.i)].forEach((u) => { if (u) knock(u, dir, delay + 160); });
+      }
+      function throwAt(q) {
+        if (throwing || over) return; throwing = true; throws++;
+        pup.play('a-hop');
+        const ball = el('circle', { r: 26, fill: C_BLUE, stroke: '#2a6db0', 'stroke-width': 4 }, L.fx);
+        const sx = 420, sy = 640, ex = q.x, ey = q.y - 100;
+        tween(560, (t) => { ball.setAttribute('cx', sx + (ex - sx) * t); ball.setAttribute('cy', sy + (ey - sy) * t - Math.sin(t * Math.PI) * 220); }, () => {
+          knock(q, 1, 0);
+          // también empuja a la vecina de su fila
+          const nb = at(q.r, q.i + 1); if (nb && Math.random() < 0.6) knock(nb, 1, 120);
+          tween(500, (t) => { ball.setAttribute('cx', ex + 200 * t); ball.setAttribute('cy', ey + 300 * t * t); }, () => ball.remove());
+          later(1300, () => {
+            throwing = false;
+            if (cans.every((c) => c.down)) celebrate();
+            else say(LT.pum);
+          });
+        });
+      }
+      cans.forEach((q) => { el('rect', { x: -66, y: -200, width: 132, height: 210, fill: 'transparent' }, q.c.g); onTap(q.c.g, () => { if (!q.down) throwAt(q); }); });
+      function celebrate() {
+        over = true;
+        S.specials = S.specials || {}; S.specials.lata = (S.specials.lata || 0) + 1; save();
+        SFX.fanfare(); fxConfetti(800, 300, 50); pup.happy(); SFX.puppies(8, 0.3);
+        const team = ['main', ...S.friends.filter((c) => c !== 'main' && c !== coat)];
+        team.forEach((c, i) => { const p = puppy(L.scene, -150, 860, 0.42, c); p.moveTo(560 + i * 150, 860, 1200 + i * 200, () => p.happy()); });
+        say(LT.allDown, { onend: () => later(300, () => say(LT.finale)) });
+        later(1500, () => {
+          const card = el('g', { cls: 'pop-in' }, L.scene); card.style.transformOrigin = '1100px 380px';
+          el('rect', { x: 840, y: 200, width: 520, height: 330, rx: 36, fill: '#fff', stroke: C_GOLD, 'stroke-width': 8 }, card);
+          star(card, 1100, 250, 34, C_GOLD);
+          cursiveWord(card, 'lata', { cx: 1100, baseline: 430, scale: 0.9, sw: 12, maxAsc: 120 });
+          el('text', { x: 1100, y: 505, 'text-anchor': 'middle', 'font-size': 34, 'font-weight': 900, fill: '#7a5a20', text: 'l · a · t · a' }, card);
+        });
+        later(4500, () => {
+          button(L.scene, { x: 960, y: 640, w: 300, h: 100, label: 'Otra vez', fs: 38, fill: C_GREEN, onTap: () => go('lata', { step: 0 }) });
+          const b = button(L.scene, { x: 1300, y: 640, w: 300, h: 100, label: 'Al parque', fs: 38, onTap: () => go('map') });
+          b.querySelector('.press').classList.add('pulse');
+        });
+      }
+      instruction('Toca una lata para lanzar la pelota');
+      lataBar(() => LT.tower);
+      later(400, () => say(LT.tower));
+    },
+  ];
+
   SCREENS.casita = function () {
     bgPlain('#fdebd3');
     el('rect', { x: 0, y: 640, width: 1600, height: 260, fill: '#e8c79a' }, L.bg);
@@ -1676,6 +2081,9 @@
         }
       });
     });
+    const walk = (o) => { if (typeof o === 'string') out.add(o); else Object.values(o).forEach(walk); };
+    walk(LT); Object.values(LT_NAME).forEach((t) => out.add(t));
+    ['la', 'ta', LT.findOk + ' ' + LT.findDone, LT.intro + ' ' + LT.open, 'Mmm, esa no. Busca la ele.', 'Mmm, esa no. Ahora busca la a.', 'Mmm, esa no. Ahora busca la te.', 'Mmm, esa no. Y otra vez la a.', spell('lata')].forEach((t) => out.add(t));
     return Array.from(out).map((t) => ({ t, id: clipId(t) }));
   }
   window.__mila = { allPhrases, go, S: () => S, setState: (fn) => fn(S), setLesson, save, splitLang };
